@@ -141,3 +141,12 @@ scache    unix  -       -       n       -       1       scache
 #mailman   unix  -       n       n       -       -       pipe
 #  flags=FR user=list argv=/usr/lib/mailman/bin/postfix-to-mailman.py
 #  ${nexthop} ${user}
+
+# BEGIN BILLIONMAIL SMTPS CONFIG - DO NOT EDIT THIS MARKER
+smtps     unix  -       -       n       -       -       smtp
+    -o smtp_tls_wrappermode=yes
+    -o smtp_tls_security_level=encrypt
+# END BILLIONMAIL SMTPS CONFIG - DO NOT EDIT THIS MARKER
+# BEGIN BILLIONMAIL RELAY CONFIG - DO NOT EDIT THIS MARKER
+# No active relay configurations
+# END BILLIONMAIL RELAY CONFIG - DO NOT EDIT THIS MARKER
