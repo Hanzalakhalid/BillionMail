@@ -103,7 +103,9 @@
 			"sequences": "Sequences",
 			"leads": "Leads",
 			"enrichment": "Enrichment",
-			"videoOutreach": "ビデオアウトリーチ"
+			"videoOutreach": "ビデオアウトリーチ",
+			"sms": "SMS",
+			"push": "Push"
 		}
 	},
 	"login": {

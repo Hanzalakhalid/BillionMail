@@ -18,13 +18,16 @@ const routesReflectList = [
 	'Settings',
 	'Automation',
 	'Video Outreach',
+	'SMS',
+	'Push',
 ]
 
 // Import routes from modules
 const modules = import.meta.webpackContext('./modules', {
 	// Whether to search for subdirectories
 	recursive: false,
-	regExp: /^[^.]+\.ts$/,
+	// Keys look like "./overview.ts"; skip "./overview.test.ts"
+	regExp: /^\.\/[^.]+\.ts$/,
 })
 
 // Module routes
@@ -39,11 +42,12 @@ for (const path of modules.keys()) {
 }
 
 // Sort module routes
-menuList = menuList.reduce((p: RouteRecordRaw[], v: RouteRecordRaw) => {
-	const routeIndex = routesReflectList.findIndex(item => item == v.meta!.title)
-	p[routeIndex] = v
-	return p
-}, [] as RouteRecordRaw[])
+// Unlisted routes go last; sorting (not index assignment) avoids holes for listed titles without a module
+const routeOrder = (route: RouteRecordRaw) => {
+	const index = routesReflectList.indexOf(route.meta!.title as string)
+	return index === -1 ? routesReflectList.length : index
+}
+menuList = menuList.sort((a, b) => routeOrder(a) - routeOrder(b))
 
 const otherArray: RouteRecordRaw[] = []
 

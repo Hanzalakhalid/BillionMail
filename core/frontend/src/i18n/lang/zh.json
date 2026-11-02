@@ -112,7 +112,9 @@
 			"sequences": "Sequences",
 			"leads": "Leads",
 			"enrichment": "Enrichment",
-			"videoOutreach": "视频外联"
+			"videoOutreach": "视频外联",
+			"sms": "短信",
+			"push": "推送通知"
 		}
 	},
 	"login": {

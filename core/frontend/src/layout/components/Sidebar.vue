@@ -117,6 +117,8 @@ const iconMap: Record<string, VNodeChild> = {
 	template: <i class="i-mdi-settings-outline"></i>,
 	logs: <i class="i-icon-park-outline:log"></i>,
 	'video-outreach': <i class="i-mdi-video-outline"></i>,
+	sms: <i class="i-mdi-message-text-outline"></i>,
+	push: <i class="i-mdi-bell-outline"></i>,
 	logout: <i class="i-mdi-logout"></i>,
 }
 

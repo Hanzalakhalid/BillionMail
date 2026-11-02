@@ -17,9 +17,11 @@ import (
 	"billionmail-core/internal/controller/middleware"
 	"billionmail-core/internal/controller/operation_log"
 	"billionmail-core/internal/controller/overview"
+	push_ctrl "billionmail-core/internal/controller/push"
 	"billionmail-core/internal/controller/rbac"
 	"billionmail-core/internal/controller/relay"
 	"billionmail-core/internal/controller/settings"
+	sms_ctrl "billionmail-core/internal/controller/sms"
 	"billionmail-core/internal/controller/subscribe_list"
 	"billionmail-core/internal/controller/tags"
 	video_outreach_ctrl "billionmail-core/internal/controller/video_outreach"
@@ -333,6 +335,8 @@ var (
 					askai.NewV1(),
 					tags.NewV1(),
 					video_outreach_ctrl.NewV1(),
+					sms_ctrl.NewV1(),
+					push_ctrl.NewV1(),
 				)
 			})
 

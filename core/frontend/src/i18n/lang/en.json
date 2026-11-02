@@ -112,7 +112,9 @@
 			"sequences": "Sequences",
 			"leads": "Leads",
 			"enrichment": "Enrichment",
-			"videoOutreach": "Video Outreach"
+			"videoOutreach": "Video Outreach",
+			"sms": "SMS",
+			"push": "Push"
 		}
 	},
 	"login": {
