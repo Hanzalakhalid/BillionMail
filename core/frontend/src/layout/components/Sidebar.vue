@@ -119,6 +119,7 @@ const iconMap: Record<string, VNodeChild> = {
 	'video-outreach': <i class="i-mdi-video-outline"></i>,
 	sms: <i class="i-mdi-message-text-outline"></i>,
 	push: <i class="i-mdi-bell-outline"></i>,
+	whatsapp: <i class="i-mdi-whatsapp"></i>,
 	logout: <i class="i-mdi-logout"></i>,
 }
 

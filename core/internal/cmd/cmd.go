@@ -25,6 +25,7 @@ import (
 	"billionmail-core/internal/controller/subscribe_list"
 	"billionmail-core/internal/controller/tags"
 	video_outreach_ctrl "billionmail-core/internal/controller/video_outreach"
+	whatsapp_ctrl "billionmail-core/internal/controller/whatsapp"
 	"billionmail-core/internal/service/database_initialization"
 	docker "billionmail-core/internal/service/dockerapi"
 	"billionmail-core/internal/service/maillog_stat"
@@ -337,6 +338,7 @@ var (
 					video_outreach_ctrl.NewV1(),
 					sms_ctrl.NewV1(),
 					push_ctrl.NewV1(),
+					whatsapp_ctrl.NewV1(),
 				)
 			})
 

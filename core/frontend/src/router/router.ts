@@ -19,6 +19,7 @@ const routesReflectList = [
 	'Automation',
 	'Video Outreach',
 	'SMS',
+	'WhatsApp',
 	'Push',
 ]
 

@@ -114,7 +114,8 @@
 			"enrichment": "Enrichment",
 			"videoOutreach": "视频外联",
 			"sms": "短信",
-			"push": "推送通知"
+			"push": "推送通知",
+			"whatsapp": "WhatsApp"
 		}
 	},
 	"login": {

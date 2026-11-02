@@ -105,7 +105,8 @@
 			"enrichment": "Enrichment",
 			"videoOutreach": "ビデオアウトリーチ",
 			"sms": "SMS",
-			"push": "Push"
+			"push": "Push",
+			"whatsapp": "WhatsApp"
 		}
 	},
 	"login": {

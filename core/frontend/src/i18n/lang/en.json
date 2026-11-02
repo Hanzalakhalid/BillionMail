@@ -114,7 +114,8 @@
 			"enrichment": "Enrichment",
 			"videoOutreach": "Video Outreach",
 			"sms": "SMS",
-			"push": "Push"
+			"push": "Push",
+			"whatsapp": "WhatsApp"
 		}
 	},
 	"login": {
