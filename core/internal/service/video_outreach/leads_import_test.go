@@ -66,13 +66,27 @@ func TestParseListingCSV_RequiresEmailColumn(t *testing.T) {
 }
 
 func TestBuildLandingURL(t *testing.T) {
-	u := BuildLandingURL("https://mail.example.com/", "Ahmed Ali", "https://v.example/a.mp4", "", "https://cal.com/x")
+	u := BuildLandingURL("https://mail.example.com/", "abc123")
 
 	parsed, err := url.Parse(u)
 	require.NoError(t, err)
+	assert.Equal(t, "mail.example.com", parsed.Host)
 	assert.Equal(t, "/landing/video", parsed.Path)
-	assert.Equal(t, "Ahmed Ali", parsed.Query().Get("name"))
-	assert.Equal(t, "https://v.example/a.mp4", parsed.Query().Get("video"))
-	assert.Equal(t, "https://cal.com/x", parsed.Query().Get("cta"))
-	assert.False(t, parsed.Query().Has("thumb"))
+	assert.Equal(t, "abc123", parsed.Query().Get("t"))
+}
+
+func TestNewVideoToken_UniqueAndURLSafe(t *testing.T) {
+	a, b := NewVideoToken(), NewVideoToken()
+
+	assert.Len(t, a, 24)
+	assert.NotEqual(t, a, b)
+	assert.Equal(t, a, url.QueryEscape(a))
+}
+
+func TestIsValidEvent(t *testing.T) {
+	assert.True(t, IsValidEvent(EventView))
+	assert.True(t, IsValidEvent(EventPlay))
+	assert.True(t, IsValidEvent(EventCTA))
+	assert.False(t, IsValidEvent("delete"))
+	assert.False(t, IsValidEvent(""))
 }

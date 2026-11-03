@@ -130,16 +130,8 @@ func firstEmail(cell string) string {
 	return ""
 }
 
-// BuildLandingURL returns the public video landing page URL for a contact.
-func BuildLandingURL(baseURL, name, videoURL, thumbURL, ctaURL string) string {
-	q := url.Values{}
-	q.Set("name", name)
-	q.Set("video", videoURL)
-	if thumbURL != "" {
-		q.Set("thumb", thumbURL)
-	}
-	if ctaURL != "" {
-		q.Set("cta", ctaURL)
-	}
-	return strings.TrimRight(baseURL, "/") + "/landing/video?" + q.Encode()
+// BuildLandingURL returns the public video landing page URL for a contact's video token.
+// The page loads the video and Book a Call link from the contact, so views and clicks can be tracked.
+func BuildLandingURL(baseURL, token string) string {
+	return strings.TrimRight(baseURL, "/") + "/landing/video?t=" + url.QueryEscape(token)
 }

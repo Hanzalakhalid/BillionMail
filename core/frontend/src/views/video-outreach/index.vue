@@ -1,5 +1,12 @@
 <template>
 	<div class="p-24px">
+		<n-grid :cols="6" :x-gap="12" class="mb-16px" responsive="screen" item-responsive>
+			<n-gi v-for="card in statCards" :key="card.label" span="6 m:3 l:1">
+				<n-card size="small">
+					<n-statistic :label="card.label" :value="card.value" />
+				</n-card>
+			</n-gi>
+		</n-grid>
 		<bt-table-layout>
 			<template #toolsLeft>
 				<n-button type="primary" @click="openImport">Import leads (CSV)</n-button>
@@ -76,7 +83,40 @@ import { DataTableColumns, NTag, NButton, SelectOption } from 'naive-ui'
 import { useDataTable } from '@/hooks/useDataTable'
 import { isObject } from '@/utils'
 import { getGroupAll } from '@/api/modules/contacts/group'
-import { listVideoOutreach, importLeads, setVideo, type VideoStatus } from '@/api/modules/video-outreach'
+import { formatTime } from '@/utils/time'
+import {
+	listVideoOutreach,
+	importLeads,
+	setVideo,
+	getVideoOutreachStats,
+	type VideoStatus,
+	type VideoOutreachStats,
+} from '@/api/modules/video-outreach'
+
+// Landing page activity totals
+const stats = ref<VideoOutreachStats | null>(null)
+
+const statCards = computed(() => [
+	{ label: 'Videos ready', value: stats.value?.ready_videos ?? 0 },
+	{ label: 'Page opens', value: stats.value?.views ?? 0 },
+	{ label: 'Video plays', value: stats.value?.plays ?? 0 },
+	{ label: 'Book a Call clicks', value: stats.value?.clicks ?? 0 },
+	{ label: 'Leads who opened', value: stats.value?.leads_viewed ?? 0 },
+	{ label: 'Leads who clicked', value: stats.value?.leads_clicked ?? 0 },
+])
+
+const loadStats = async () => {
+	const res = await getVideoOutreachStats()
+	if (isObject<VideoOutreachStats>(res)) {
+		stats.value = res
+	}
+}
+
+// Fetch the list and refresh the cards together
+const listWithStats = (params: any) => {
+	loadStats()
+	return listVideoOutreach(params)
+}
 
 const tierOptions = [
 	{ label: 'Tier 1 (Video)', value: 'tier_1' },
@@ -90,7 +130,7 @@ const { tableProps, pageProps, tableParams, fetchTable } = useDataTable<any>({
 		page_size: 20,
 		tier: null as string | null,
 	},
-	fetchFn: listVideoOutreach,
+	fetchFn: listWithStats,
 })
 
 // Landing links are saved with the public base URL; open them on the current host so they work locally too
@@ -208,6 +248,37 @@ const columns: DataTableColumns<VideoStatus> = [
 				</NTag>
 			)
 		},
+	},
+	{
+		title: 'Opens',
+		key: 'views',
+		width: 70,
+		render: row => row.views || '-',
+	},
+	{
+		title: 'Plays',
+		key: 'plays',
+		width: 70,
+		render: row => row.plays || '-',
+	},
+	{
+		title: 'Calls',
+		key: 'clicks',
+		width: 80,
+		render: row =>
+			row.clicks ? (
+				<NTag type="success" size="small">
+					{row.clicks}
+				</NTag>
+			) : (
+				'-'
+			),
+	},
+	{
+		title: 'Last seen',
+		key: 'last_activity',
+		width: 160,
+		render: row => (row.last_activity ? formatTime(row.last_activity) : '-'),
 	},
 	{
 		title: 'Video',

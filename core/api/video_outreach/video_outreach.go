@@ -12,4 +12,5 @@ type IVideoOutreachV1 interface {
 	ListVideoOutreach(ctx context.Context, req *v1.ListVideoOutreachReq) (res *v1.ListVideoOutreachRes, err error)
 	ImportLeads(ctx context.Context, req *v1.ImportLeadsReq) (res *v1.ImportLeadsRes, err error)
 	SetVideo(ctx context.Context, req *v1.SetVideoReq) (res *v1.SetVideoRes, err error)
+	GetStats(ctx context.Context, req *v1.GetStatsReq) (res *v1.GetStatsRes, err error)
 }

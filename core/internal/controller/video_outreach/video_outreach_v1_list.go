@@ -44,9 +44,19 @@ func (c *ControllerV1) ListVideoOutreach(ctx context.Context, req *v1.ListVideoO
 		return
 	}
 
+	ids := make([]int, 0, len(contacts))
+	for _, c := range contacts {
+		ids = append(ids, c.Id)
+	}
+	counts := eventCounts(ctx, ids)
+
 	list := make([]*v1.VideoStatus, 0, len(contacts))
 	for _, c := range contacts {
-		list = append(list, toVideoStatus(c))
+		status := toVideoStatus(c)
+		if n, ok := counts[c.Id]; ok {
+			status.Views, status.Plays, status.Clicks, status.LastActivity = n.Views, n.Plays, n.Clicks, n.LastActivity
+		}
+		list = append(list, status)
 	}
 
 	res.Data.Total = total

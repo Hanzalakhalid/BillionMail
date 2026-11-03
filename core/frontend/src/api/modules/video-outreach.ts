@@ -11,6 +11,23 @@ export interface VideoStatus {
 	thumbnail_url: string
 	landing_page_url: string
 	status: string
+	views: number
+	plays: number
+	clicks: number
+	last_activity: number
+}
+
+export interface VideoOutreachStats {
+	ready_videos: number
+	views: number
+	plays: number
+	clicks: number
+	leads_viewed: number
+	leads_clicked: number
+}
+
+export const getVideoOutreachStats = (params: { group_id?: number } = {}) => {
+	return instance.get('/video_outreach/stats', { params })
 }
 
 export const generateVideo = (data: { contact_email: string; group_id: number }) => {

@@ -253,7 +253,7 @@ var (
 						}
 
 						// Open/click tracking and video landing pages are opened by email recipients, who never pass the safe path
-						if strings.HasPrefix(r.URL.Path, "/pmta/") || r.URL.Path == "/landing/video" {
+						if strings.HasPrefix(r.URL.Path, "/pmta/") || strings.HasPrefix(r.URL.Path, "/landing/") {
 							return
 						}
 
@@ -351,6 +351,8 @@ var (
 
 			// Public video landing page (no auth — recipients click from email)
 			s.BindHandler("GET:/landing/video", video_outreach_ctrl.ServeLandingPage)
+			s.BindHandler("GET:/landing/video/go", video_outreach_ctrl.ServeLandingCTA)
+			s.BindHandler("POST:/landing/video/event", video_outreach_ctrl.ServeLandingEvent)
 
 			// SPA fallback
 

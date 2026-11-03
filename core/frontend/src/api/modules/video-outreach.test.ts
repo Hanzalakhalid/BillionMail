@@ -10,7 +10,7 @@ vi.mock('@/api', () => ({
   },
 }))
 
-import { listVideoOutreach, importLeads, setVideo } from './video-outreach'
+import { listVideoOutreach, importLeads, setVideo, getVideoOutreachStats } from './video-outreach'
 
 describe('video outreach API', () => {
   beforeEach(() => {
@@ -27,6 +27,11 @@ describe('video outreach API', () => {
     const data = { group_id: 2, content: 'email\na@b.com' }
     importLeads(data)
     expect(mockPost).toHaveBeenCalledWith('/video_outreach/import_leads', data, expect.any(Object))
+  })
+
+  it('getVideoOutreachStats calls GET /video_outreach/stats', () => {
+    getVideoOutreachStats({ group_id: 3 })
+    expect(mockGet).toHaveBeenCalledWith('/video_outreach/stats', { params: { group_id: 3 } })
   })
 
   it('setVideo calls POST /video_outreach/set_video', () => {

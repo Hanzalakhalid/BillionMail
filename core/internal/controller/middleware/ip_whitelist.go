@@ -40,6 +40,7 @@ func isExcludedPath(path string) bool {
 	// Prefix match (static resources, acme challenge, etc.)
 	if strings.HasPrefix(path, "/.well-known/acme-challenge") ||
 		strings.HasPrefix(path, "/pmta/") ||
+		strings.HasPrefix(path, "/landing/") ||
 		strings.HasPrefix(path, "/roundcube") {
 		g.Log().Debug(context.Background(), "[IP Whitelist 2] Excluded path: ", path, " allowed")
 		return true

@@ -41,6 +41,29 @@ type VideoStatus struct {
 	ThumbnailURL   string `json:"thumbnail_url" dc:"Thumbnail URL (if generated)"`
 	LandingPageURL string `json:"landing_page_url" dc:"Landing page URL (if generated)"`
 	Status         string `json:"status" dc:"Status (pending, ready, not_eligible)"`
+	Views          int    `json:"views" dc:"Times the landing page was opened"`
+	Plays          int    `json:"plays" dc:"Times the video was started"`
+	Clicks         int    `json:"clicks" dc:"Book a Call clicks"`
+	LastActivity   int    `json:"last_activity" dc:"Unix time of the latest landing page event"`
+}
+
+// GetStatsReq returns landing page totals for the cards above the lead list.
+type GetStatsReq struct {
+	g.Meta        `path:"/video_outreach/stats" method:"get" tags:"VideoOutreach" summary:"Video landing page activity totals"`
+	Authorization string `json:"authorization" dc:"Authorization" in:"header"`
+	GroupID       int    `json:"group_id" v:"min:0" dc:"Filter by group ID" in:"query"`
+}
+
+type GetStatsRes struct {
+	api_v1.StandardRes
+	Data struct {
+		ReadyVideos  int `json:"ready_videos" dc:"Leads with a video"`
+		Views        int `json:"views" dc:"Landing page opens"`
+		Plays        int `json:"plays" dc:"Video plays"`
+		Clicks       int `json:"clicks" dc:"Book a Call clicks"`
+		LeadsViewed  int `json:"leads_viewed" dc:"Leads who opened their page"`
+		LeadsClicked int `json:"leads_clicked" dc:"Leads who clicked Book a Call"`
+	} `json:"data"`
 }
 
 type GetVideoStatusRes struct {

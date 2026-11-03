@@ -7,7 +7,6 @@ import (
 	vo "billionmail-core/internal/service/video_outreach"
 	"context"
 	"encoding/json"
-	"strings"
 
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
@@ -27,12 +26,12 @@ func (c *ControllerV1) SetVideo(ctx context.Context, req *v1.SetVideoReq) (res *
 		return res, nil
 	}
 
-	name := contact.Attribs["name"]
-	if name == "" {
-		name, _, _ = strings.Cut(contact.Email, "@")
+	// Keep the token when the video is replaced, so links already sent keep working
+	token := contact.Attribs[vo.AttrVideoToken]
+	if token == "" {
+		token = vo.NewVideoToken()
 	}
-
-	landing := vo.BuildLandingURL(domains.GetBaseURL(), name, req.VideoUrl, req.ThumbnailUrl, req.CtaUrl)
+	landing := vo.BuildLandingURL(domains.GetBaseURL(), token)
 
 	// A video is "ready" once all three assets exist; without a thumbnail the video itself stands in
 	thumb := req.ThumbnailUrl
@@ -43,6 +42,8 @@ func (c *ControllerV1) SetVideo(ctx context.Context, req *v1.SetVideoReq) (res *
 		vo.AttrVideoURL:       req.VideoUrl,
 		vo.AttrThumbnailURL:   thumb,
 		vo.AttrLandingPageURL: landing,
+		vo.AttrCtaURL:         req.CtaUrl,
+		vo.AttrVideoToken:     token,
 	})
 
 	_, err = g.DB().Exec(ctx, `UPDATE bm_contacts SET attribs = COALESCE(attribs, '{}'::jsonb) || CAST(? AS jsonb) WHERE id = ?`,
