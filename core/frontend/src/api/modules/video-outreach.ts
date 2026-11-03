@@ -26,6 +26,22 @@ export interface VideoOutreachStats {
 	leads_clicked: number
 }
 
+export interface VideoEvent {
+	event: 'view' | 'play' | 'cta'
+	create_time: number
+	contact_email: string
+	name: string
+}
+
+export const getVideoEvents = (params: {
+	contact_email?: string
+	group_id?: number
+	page: number
+	page_size: number
+}) => {
+	return instance.get('/video_outreach/events', { params })
+}
+
 export const getVideoOutreachStats = (params: { group_id?: number } = {}) => {
 	return instance.get('/video_outreach/stats', { params })
 }

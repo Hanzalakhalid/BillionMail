@@ -10,6 +10,7 @@
 		<bt-table-layout>
 			<template #toolsLeft>
 				<n-button type="primary" @click="openImport">Import leads (CSV)</n-button>
+				<n-button class="ml-12px" @click="openActivity()">Recent activity</n-button>
 			</template>
 			<template #toolsRight>
 				<n-select
@@ -55,6 +56,21 @@
 			</n-button>
 		</n-modal>
 
+		<n-modal v-model:show="activity.show" preset="card" :title="activity.title" :style="{ width: '560px' }">
+			<n-spin :show="activity.loading">
+				<n-empty v-if="!activity.list.length" description="No activity yet. It appears when the lead opens the link." />
+				<n-timeline v-else>
+					<n-timeline-item
+						v-for="(item, index) in activity.list"
+						:key="index"
+						:type="eventInfo[item.event]?.type || 'default'"
+						:title="eventInfo[item.event]?.label || item.event"
+						:content="activity.lead ? '' : item.name || item.contact_email"
+						:time="formatTime(item.create_time)" />
+				</n-timeline>
+			</n-spin>
+		</n-modal>
+
 		<n-modal v-model:show="videoForm.show" preset="card" title="Add video" :style="{ width: '560px' }">
 			<n-alert type="info" class="mb-16px">
 				Record a short video (phone, Loom) and paste a direct link to the video file (.mp4).
@@ -89,9 +105,49 @@ import {
 	importLeads,
 	setVideo,
 	getVideoOutreachStats,
+	getVideoEvents,
 	type VideoStatus,
 	type VideoOutreachStats,
+	type VideoEvent,
 } from '@/api/modules/video-outreach'
+
+// Who did what on their landing page, newest first
+const eventInfo: Record<string, { label: string; type: 'info' | 'warning' | 'success' }> = {
+	view: { label: 'Opened the page', type: 'info' },
+	play: { label: 'Played the video', type: 'warning' },
+	cta: { label: 'Clicked Book a Call', type: 'success' },
+}
+
+const activity = ref({
+	show: false,
+	loading: false,
+	title: '',
+	lead: false,
+	list: [] as VideoEvent[],
+})
+
+const openActivity = async (row?: VideoStatus) => {
+	activity.value = {
+		show: true,
+		loading: true,
+		title: row ? `Activity: ${row.name || row.contact_email}` : 'Recent activity (all leads)',
+		lead: !!row,
+		list: [],
+	}
+	try {
+		const res = await getVideoEvents({
+			contact_email: row?.contact_email,
+			group_id: row?.group_id,
+			page: 1,
+			page_size: 50,
+		})
+		if (isObject<{ list: VideoEvent[] | null }>(res)) {
+			activity.value.list = res.list ?? []
+		}
+	} finally {
+		activity.value.loading = false
+	}
+}
 
 // Landing page activity totals
 const stats = ref<VideoOutreachStats | null>(null)
@@ -277,15 +333,27 @@ const columns: DataTableColumns<VideoStatus> = [
 	{
 		title: 'Last seen',
 		key: 'last_activity',
-		width: 160,
-		render: row => (row.last_activity ? formatTime(row.last_activity) : '-'),
+		width: 170,
+		render: row =>
+			row.last_activity ? (
+				<NButton text type="primary" onClick={() => openActivity(row)}>
+					{formatTime(row.last_activity)}
+				</NButton>
+			) : (
+				'-'
+			),
 	},
 	{
-		title: 'Video',
+		title: 'Actions',
 		key: 'video_url',
-		width: 160,
+		width: 210,
 		render: row => (
 			<div class="flex gap-12px">
+				{row.last_activity ? (
+					<NButton text type="primary" onClick={() => openActivity(row)}>
+						Activity
+					</NButton>
+				) : null}
 				{row.landing_page_url ? (
 					<NButton text type="primary" onClick={() => openLanding(row.landing_page_url)}>
 						View

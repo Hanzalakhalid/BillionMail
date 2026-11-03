@@ -47,6 +47,31 @@ type VideoStatus struct {
 	LastActivity   int    `json:"last_activity" dc:"Unix time of the latest landing page event"`
 }
 
+// ListEventsReq lists landing page activity, newest first, for one lead or all leads.
+type ListEventsReq struct {
+	g.Meta        `path:"/video_outreach/events" method:"get" tags:"VideoOutreach" summary:"Landing page activity per lead"`
+	Authorization string `json:"authorization" dc:"Authorization" in:"header"`
+	ContactEmail  string `json:"contact_email" dc:"Only this lead (with group_id)" in:"query"`
+	GroupID       int    `json:"group_id" v:"min:0" dc:"Filter by group ID" in:"query"`
+	Page          int    `json:"page" v:"min:1" dc:"Page number" in:"query" default:"1"`
+	PageSize      int    `json:"page_size" v:"min:1|max:100" dc:"Page size" in:"query" default:"20"`
+}
+
+type VideoEvent struct {
+	Event        string `json:"event" dc:"view, play or cta"`
+	CreateTime   int    `json:"create_time"`
+	ContactEmail string `json:"contact_email"`
+	Name         string `json:"name"`
+}
+
+type ListEventsRes struct {
+	api_v1.StandardRes
+	Data struct {
+		Total int           `json:"total"`
+		List  []*VideoEvent `json:"list"`
+	} `json:"data"`
+}
+
 // GetStatsReq returns landing page totals for the cards above the lead list.
 type GetStatsReq struct {
 	g.Meta        `path:"/video_outreach/stats" method:"get" tags:"VideoOutreach" summary:"Video landing page activity totals"`
