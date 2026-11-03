@@ -3,6 +3,7 @@ package cmd
 import (
 	"billionmail-core/internal/consts"
 	"billionmail-core/internal/controller/abnormal_recipient"
+	ad_intel_ctrl "billionmail-core/internal/controller/ad_intel"
 	"billionmail-core/internal/controller/askai"
 	"billionmail-core/internal/controller/batch_mail"
 	"billionmail-core/internal/controller/campaign"
@@ -346,6 +347,7 @@ var (
 					push_ctrl.NewV1(),
 					whatsapp_ctrl.NewV1(),
 					delivery_log_ctrl.NewV1(),
+					ad_intel_ctrl.NewV1(),
 				)
 			})
 

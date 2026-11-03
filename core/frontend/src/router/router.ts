@@ -18,6 +18,7 @@ const routesReflectList = [
 	'Settings',
 	'Automation',
 	'Video Outreach',
+	'Ad Finder',
 	'SMS',
 	'WhatsApp',
 	'Push',
