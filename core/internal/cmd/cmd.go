@@ -252,6 +252,11 @@ var (
 							return
 						}
 
+						// Open/click tracking and video landing pages are opened by email recipients, who never pass the safe path
+						if strings.HasPrefix(r.URL.Path, "/pmta/") || r.URL.Path == "/landing/video" {
+							return
+						}
+
 						if r.IsFileRequest() {
 							return
 						}
