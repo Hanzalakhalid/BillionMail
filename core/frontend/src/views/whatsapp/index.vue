@@ -194,7 +194,9 @@ const templateOptions = computed<SelectOption[]>(() =>
 	templates.value.map(t => ({ label: `${t.name} (${t.language})`, value: templateKey(t) }))
 )
 
-const selectedTemplateKey = computed(() => (form.value.template ? templateKey(form.value) : null))
+const selectedTemplateKey = computed(() =>
+	form.value.template ? templateKey({ name: form.value.template, language: form.value.language }) : null
+)
 
 const selectedTemplate = computed(() =>
 	templates.value.find(t => templateKey(t) === selectedTemplateKey.value)
