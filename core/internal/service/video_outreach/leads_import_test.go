@@ -38,6 +38,20 @@ func TestParseListingCSV_ScraperFormat(t *testing.T) {
 	assert.Equal(t, lead_scoring.TagTier3, chain.Attribs[lead_scoring.AttrLeadTier])
 }
 
+func TestParseListingCSV_RawScrapeColumns(t *testing.T) {
+	// Columns written by the scraper kit's scripts/scrape.sh
+	csv := "title,phone,emails,website,category,address,review_rating,review_count\n" +
+		"Cafe Noor,+92300,info@noor.pk,,Cafe,Karachi,4.7,20\n"
+
+	leads, _, err := ParseListingCSV(csv)
+
+	require.NoError(t, err)
+	require.Len(t, leads, 1)
+	assert.Equal(t, "Cafe Noor", leads[0].Attribs["name"])
+	assert.Equal(t, "4.7", leads[0].Attribs["rating"])
+	assert.Equal(t, lead_scoring.TagTier1, leads[0].Attribs[lead_scoring.AttrLeadTier])
+}
+
 func TestParseListingCSV_MultipleEmailsInCell(t *testing.T) {
 	leads, _, err := ParseListingCSV("name,email\nCafe,\"not-an-email; Owner@Cafe.com\"\n")
 

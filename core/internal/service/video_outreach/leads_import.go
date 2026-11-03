@@ -29,7 +29,7 @@ var headerAliases = map[string]string{
 	"email": "email", "emails": "email",
 	"phone": "phone", "phonenumber": "phone",
 	"website": "website", "url": "website",
-	"rating": "rating", "avgrating": "rating",
+	"rating": "rating", "avgrating": "rating", "reviewrating": "rating",
 	"reviewcount": "review_count", "reviews": "review_count", "reviewscount": "review_count",
 	"category":   "category",
 	"address":    "address",
