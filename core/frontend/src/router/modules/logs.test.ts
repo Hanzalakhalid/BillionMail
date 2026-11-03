@@ -20,12 +20,15 @@ describe('logs route', () => {
     })
   })
 
-  it('first child has operation and error sub-routes', () => {
+  it('first child has operation, error and delivery sub-routes', () => {
     const logs = route.children![0]
     expect(logs.name).toBe('Logs')
     expect(logs.redirect).toBe('/logs/operation')
     const subRoutes = logs.children!
-    expect(subRoutes).toHaveLength(2)
+    expect(subRoutes).toHaveLength(3)
+
+    expect(subRoutes[2].path).toBe('delivery')
+    expect(subRoutes[2].name).toBe('Delivery Logs')
 
     expect(subRoutes[0].path).toBe('operation')
     expect(subRoutes[0].name).toBe('Operation Logs')

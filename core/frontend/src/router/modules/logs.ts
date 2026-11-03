@@ -25,6 +25,12 @@ const route: RouteRecordRaw = {
 					meta: { title: 'Error logs', titleKey: '' },
 					component: () => import('@/views/logs/error/index.vue'),
 				},
+				{
+					path: 'delivery',
+					name: 'Delivery Logs',
+					meta: { title: 'Delivery logs', titleKey: '' },
+					component: () => import('@/views/logs/delivery/index.vue'),
+				},
 			],
 		},
 	],

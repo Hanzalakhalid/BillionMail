@@ -7,6 +7,7 @@ import (
 	"billionmail-core/internal/controller/batch_mail"
 	"billionmail-core/internal/controller/campaign"
 	"billionmail-core/internal/controller/contact"
+	delivery_log_ctrl "billionmail-core/internal/controller/delivery_log"
 	"billionmail-core/internal/controller/dockerapi"
 	"billionmail-core/internal/controller/domains"
 	"billionmail-core/internal/controller/email_template"
@@ -339,6 +340,7 @@ var (
 					sms_ctrl.NewV1(),
 					push_ctrl.NewV1(),
 					whatsapp_ctrl.NewV1(),
+					delivery_log_ctrl.NewV1(),
 				)
 			})
 
