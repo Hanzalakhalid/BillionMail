@@ -74,6 +74,10 @@ const addDropdownOptions: DropdownOption[] = [
 		key: 'sendgrid',
 	},
 	{
+		label: 'Mandrill (Mailchimp)',
+		key: 'mandrill',
+	},
+	{
 		label: t('smtp.providers.custom'),
 		key: 'custom',
 	},

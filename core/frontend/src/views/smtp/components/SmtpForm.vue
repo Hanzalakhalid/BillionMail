@@ -169,6 +169,15 @@ const typeMap = {
 		password: '',
 		remark: 'SendGrid',
 	},
+	// Mandrill SMTP: any username works, the password is a Mandrill API key
+	mandrill: {
+		smtp_name: 'Mandrill',
+		relay_host: 'smtp.mandrillapp.com',
+		relay_port: 587,
+		username: 'MandrillUser',
+		password: '',
+		remark: 'Mandrill',
+	},
 	custom: {
 		smtp_name: 'Custom SMTP Relay',
 		relay_host: '',

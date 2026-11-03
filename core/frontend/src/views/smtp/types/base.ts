@@ -1,4 +1,4 @@
-export type SmtpServiceType = 'gmail' | 'sendgrid' | 'local' | 'custom'
+export type SmtpServiceType = 'gmail' | 'sendgrid' | 'mandrill' | 'local' | 'custom'
 
 export interface SmtpService {
 	id: number
