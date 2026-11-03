@@ -335,7 +335,7 @@ func TestIntegration_JSONBMergeSimulation(t *testing.T) {
 	assert.Equal(t, "Bright Horizon Dental", merged["business_name"])  // original preserved
 	assert.Equal(t, "142", merged["review_count"])                     // original preserved
 	assert.Equal(t, strconv.Itoa(result.Score), merged[AttrLeadScore]) // score added
-	assert.Equal(t, "1", merged[AttrLeadTier])                         // tier 1
+	assert.Equal(t, TagTier1, merged[AttrLeadTier])                    // tier 1
 	assert.Contains(t, merged[AttrLeadSignal], "running_ads")
 	assert.Contains(t, merged[AttrLeadSignal], "no_chat")
 
@@ -369,7 +369,7 @@ func TestIntegration_RescoringOverwritesPrevious(t *testing.T) {
 		merged[k] = v
 	}
 	assert.Equal(t, "40", merged[AttrLeadScore])
-	assert.Equal(t, "2", merged[AttrLeadTier])
+	assert.Equal(t, TagTier2, merged[AttrLeadTier])
 
 	// Enrichment adds more signals
 	merged["multiple_providers"] = "true"
@@ -384,7 +384,7 @@ func TestIntegration_RescoringOverwritesPrevious(t *testing.T) {
 
 	// Score should reflect new signals, overwriting old score
 	assert.Equal(t, strconv.Itoa(r2.Score), merged[AttrLeadScore])
-	assert.Equal(t, "1", merged[AttrLeadTier]) // now tier 1
+	assert.Equal(t, TagTier1, merged[AttrLeadTier]) // now tier 1
 	assert.True(t, r2.Score > r1.Score)
 }
 

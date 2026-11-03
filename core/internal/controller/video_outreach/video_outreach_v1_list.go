@@ -3,9 +3,9 @@ package video_outreach
 import (
 	v1 "billionmail-core/api/video_outreach/v1"
 	"billionmail-core/internal/model/entity"
-	vo "billionmail-core/internal/service/video_outreach"
 	"context"
 
+	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
 )
 
@@ -18,12 +18,12 @@ func (c *ControllerV1) ListVideoOutreach(ctx context.Context, req *v1.ListVideoO
 		q = q.Where("group_id", req.GroupID)
 	}
 
-	// Filter by tier via JSONB attribs (cast to text for LIKE since GoFrame escapes ?)
+	// Filter by tier via the JSONB attribs (->> avoids the ? operator, which GoFrame treats as a placeholder)
 	if req.Tier != "" {
-		q = q.Where("attribs::text LIKE ?", `%"lead_tier":"`+req.Tier+`"%`)
+		q = q.Where("attribs->>'lead_tier' = ?", req.Tier)
 	} else {
 		// Only show contacts that have lead scoring data
-		q = q.Where("attribs::text LIKE ?", `%"lead_tier"%`)
+		q = q.Where("COALESCE(attribs->>'lead_tier', '') <> ''")
 	}
 
 	// Count total
@@ -33,9 +33,9 @@ func (c *ControllerV1) ListVideoOutreach(ctx context.Context, req *v1.ListVideoO
 		total = 0
 	}
 
-	// Fetch page
+	// Fetch page, best leads first
 	var contacts []entity.Contact
-	err = q.OrderDesc("create_time").
+	err = q.Order(gdb.Raw("NULLIF(regexp_replace(attribs->>'lead_score', '[^0-9]', '', 'g'), '')::int DESC NULLS LAST, create_time DESC")).
 		Page(req.Page, req.PageSize).
 		Scan(&contacts)
 	if err != nil {
@@ -46,25 +46,7 @@ func (c *ControllerV1) ListVideoOutreach(ctx context.Context, req *v1.ListVideoO
 
 	list := make([]*v1.VideoStatus, 0, len(contacts))
 	for _, c := range contacts {
-		status := &v1.VideoStatus{
-			ContactEmail: c.Email,
-		}
-		if c.Attribs != nil {
-			status.LeadTier = c.Attribs["lead_tier"]
-			status.LeadScore = c.Attribs["lead_score"]
-			status.VideoURL = c.Attribs[vo.AttrVideoURL]
-			status.ThumbnailURL = c.Attribs[vo.AttrThumbnailURL]
-			status.LandingPageURL = c.Attribs[vo.AttrLandingPageURL]
-
-			if vo.HasVideoAssets(c.Attribs) {
-				status.Status = "ready"
-			} else if status.LeadTier == "tier_1" || status.LeadTier == "tier_2" {
-				status.Status = "pending"
-			} else {
-				status.Status = "not_eligible"
-			}
-		}
-		list = append(list, status)
+		list = append(list, toVideoStatus(c))
 	}
 
 	res.Data.Total = total

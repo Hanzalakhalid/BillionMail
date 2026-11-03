@@ -17,6 +17,7 @@ const (
 const (
 	TagTier1 = "tier_1"
 	TagTier2 = "tier_2"
+	TagTier3 = "tier_3" // below Tier2Threshold, skipped
 )
 
 // Attrib keys stored on Contact.Attribs
@@ -95,6 +96,11 @@ func Score(data LeadData) ScoreResult {
 	check(data.ActiveOnSocial, Signal{"active_social", "Active on social media", 5})
 	check(data.InIndustryCommunity, Signal{"industry_community", "Listed in industry community", 5})
 
+	return newResult(total, matched)
+}
+
+// newResult assigns the tier for a total score.
+func newResult(total int, matched []Signal) ScoreResult {
 	tier := 3
 	tag := ""
 	if total >= Tier1Threshold {
@@ -119,9 +125,14 @@ func (r ScoreResult) ToAttribs() map[string]string {
 	for i, s := range r.Signals {
 		names[i] = s.Name
 	}
+	// Video outreach matches lead_tier against the tier_N tags
+	tier := r.Tag
+	if tier == "" {
+		tier = TagTier3
+	}
 	m := map[string]string{
 		AttrLeadScore:  strconv.Itoa(r.Score),
-		AttrLeadTier:   strconv.Itoa(r.Tier),
+		AttrLeadTier:   tier,
 		AttrLeadSignal: strings.Join(names, ","),
 	}
 	return m

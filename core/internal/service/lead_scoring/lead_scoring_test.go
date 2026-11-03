@@ -157,7 +157,7 @@ func TestToAttribs(t *testing.T) {
 	attribs := result.ToAttribs()
 
 	assert.Equal(t, "80", attribs[AttrLeadScore])
-	assert.Equal(t, "1", attribs[AttrLeadTier])
+	assert.Equal(t, TagTier1, attribs[AttrLeadTier])
 	assert.Equal(t, "running_ads,no_chat,owner_email", attribs[AttrLeadSignal])
 }
 
@@ -166,7 +166,7 @@ func TestToAttribs_NoSignals(t *testing.T) {
 	attribs := result.ToAttribs()
 
 	assert.Equal(t, "0", attribs[AttrLeadScore])
-	assert.Equal(t, "3", attribs[AttrLeadTier])
+	assert.Equal(t, TagTier3, attribs[AttrLeadTier])
 	assert.Equal(t, "", attribs[AttrLeadSignal])
 }
 
@@ -237,7 +237,7 @@ func TestRoundtrip_AttribsToScoreToAttribs(t *testing.T) {
 
 	require.Equal(t, 1, result.Tier)
 	assert.Equal(t, "115", scoreAttribs[AttrLeadScore])
-	assert.Equal(t, "1", scoreAttribs[AttrLeadTier])
+	assert.Equal(t, TagTier1, scoreAttribs[AttrLeadTier])
 	assert.Contains(t, scoreAttribs[AttrLeadSignal], "running_ads")
 	assert.Contains(t, scoreAttribs[AttrLeadSignal], "no_chat")
 }

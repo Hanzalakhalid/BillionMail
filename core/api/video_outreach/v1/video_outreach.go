@@ -32,6 +32,9 @@ type GetVideoStatusReq struct {
 
 type VideoStatus struct {
 	ContactEmail   string `json:"contact_email" dc:"Contact email"`
+	GroupId        int    `json:"group_id" dc:"Contact group ID"`
+	Name           string `json:"name" dc:"Business or contact name"`
+	LeadReasons    string `json:"lead_reasons" dc:"Why the lead got its score"`
 	LeadTier       string `json:"lead_tier" dc:"Lead tier (tier_1, tier_2)"`
 	LeadScore      string `json:"lead_score" dc:"Lead score"`
 	VideoURL       string `json:"video_url" dc:"Video URL (if generated)"`
@@ -60,5 +63,42 @@ type ListVideoOutreachRes struct {
 	Data struct {
 		Total int            `json:"total" dc:"Total count"`
 		List  []*VideoStatus `json:"list" dc:"Video outreach list"`
+	} `json:"data"`
+}
+
+// ImportLeadsReq imports a Google Maps listing CSV (e.g. from the scraper kit) and scores every row.
+type ImportLeadsReq struct {
+	g.Meta        `path:"/video_outreach/import_leads" method:"post" tags:"VideoOutreach" summary:"Import and score leads from a listing CSV"`
+	Authorization string `json:"authorization" dc:"Authorization" in:"header"`
+	GroupId       int    `json:"group_id" v:"required|min:1" dc:"Contact group to import into"`
+	Content       string `json:"content" v:"required" dc:"CSV file content"`
+}
+
+type ImportLeadsRes struct {
+	api_v1.StandardRes
+	Data struct {
+		Imported int `json:"imported" dc:"Leads added or updated"`
+		Skipped  int `json:"skipped" dc:"Rows without a valid email, or duplicates"`
+		Tier1    int `json:"tier_1" dc:"Leads in tier 1 (video)"`
+		Tier2    int `json:"tier_2" dc:"Leads in tier 2 (text)"`
+		Tier3    int `json:"tier_3" dc:"Leads below tier 2 (skip)"`
+	} `json:"data"`
+}
+
+// SetVideoReq attaches a video recorded outside BillionMail (phone, Loom, ...) to a contact.
+type SetVideoReq struct {
+	g.Meta        `path:"/video_outreach/set_video" method:"post" tags:"VideoOutreach" summary:"Attach a video link to a contact"`
+	Authorization string `json:"authorization" dc:"Authorization" in:"header"`
+	ContactEmail  string `json:"contact_email" v:"required|email" dc:"Contact email"`
+	GroupId       int    `json:"group_id" v:"required|min:1" dc:"Contact group ID"`
+	VideoUrl      string `json:"video_url" v:"required|url" dc:"Direct video link (.mp4)"`
+	ThumbnailUrl  string `json:"thumbnail_url" v:"url" dc:"Optional preview image"`
+	CtaUrl        string `json:"cta_url" v:"url" dc:"Optional Book a Call link"`
+}
+
+type SetVideoRes struct {
+	api_v1.StandardRes
+	Data struct {
+		LandingPageUrl string `json:"landing_page_url"`
 	} `json:"data"`
 }
