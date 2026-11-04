@@ -210,6 +210,33 @@ services:
           aliases:
             - core
 
+    saas-worker-billionmail:
+      image: billionmail/core:4.9.3
+      profiles: ["saas"]
+      entrypoint: []
+      command: ["/opt/billionmail/core/saas-worker"]
+      working_dir: /opt/billionmail/core
+      depends_on:
+        - pgsql-billionmail
+        - redis-billionmail
+        - postfix-billionmail
+      volumes:
+        - ./postgresql-socket:/opt/billionmail/postgresql-socket
+        - ./.env:/opt/billionmail/.env:ro
+      environment:
+        - TZ=${TZ}
+        - REDIS_ADDR=redis:6379
+        - REDISPASS=${REDISPASS}
+        - REDISDB=${REDISDB:-1}
+        - SAAS_PUBLIC_URL=${SAAS_PUBLIC_URL:-}
+        - SAAS_FROM_EMAIL=${SAAS_FROM_EMAIL:-noreply@localhost}
+        - SAAS_SMTP_ADDR=postfix:25
+      restart: always
+      networks:
+        billionmail-network:
+          aliases:
+            - saas-worker
+
 
 networks:
   billionmail-network:

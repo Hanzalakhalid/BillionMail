@@ -42,8 +42,6 @@ import (
 	"github.com/gogf/gf/v2/os/gcache"
 	"github.com/gogf/gf/v2/os/gctx"
 
-	"github.com/g0rbe/go-chattr"
-
 	"billionmail-core/internal/consts"
 )
 
@@ -1602,26 +1600,7 @@ func ChattrRecursive(path string, attr string) error {
 
 	defer fp.Close()
 
-	var flag int32
-
-	switch attr[1] {
-	case 'i':
-		flag = chattr.FS_IMMUTABLE_FL
-	case 'a':
-		flag = chattr.FS_APPEND_FL
-	case 'd':
-		flag = chattr.FS_NODUMP_FL
-	case 's':
-		flag = chattr.FS_SYNC_FL
-	case 'c':
-		flag = chattr.FS_COMPR_FL
-	}
-
-	if attr[0] == '+' {
-		return chattr.SetAttr(fp, flag)
-	}
-
-	return chattr.UnsetAttr(fp, flag)
+	return changeFileAttribute(fp, attr)
 }
 
 // Create directory (for user)
@@ -2400,6 +2379,11 @@ func DockerApiFromCtx(ctx context.Context) *docker.DockerAPI {
 
 // DockerEnv get Docker Environment Configuration
 func DockerEnv(envName string) (envVal string, err error) {
+	// Runtime environment variables take precedence in containers and managed
+	// services. The .env fallback preserves existing self-hosted behavior.
+	if value, exists := os.LookupEnv(envName); exists {
+		return value, nil
+	}
 	// Read environment from ../.env
 	envFile := AbsPath(consts.DEFAULT_DOCKER_ENV_FILE)
 
@@ -2424,7 +2408,7 @@ func DockerEnv(envName string) (envVal string, err error) {
 		}
 
 		// Split by =
-		env := strings.Split(row, "=")
+		env := strings.SplitN(row, "=", 2)
 		if len(env) == 2 {
 			if strings.TrimSpace(env[0]) == envName {
 				envVal = strings.TrimSpace(env[1])

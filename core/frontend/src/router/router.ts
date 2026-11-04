@@ -22,6 +22,7 @@ const routesReflectList = [
 	'SMS',
 	'WhatsApp',
 	'Push',
+	'Team Members',
 ]
 
 // Import routes from modules
@@ -67,6 +68,11 @@ export const routes: RouteRecordRaw[] = [
 		name: 'Login',
 		component: () => import('@/views/login/index.vue'),
 	},
+	{ path: '/register', name: 'Register', component: () => import('@/views/auth/register.vue') },
+	{ path: '/forgot-password', name: 'ForgotPassword', component: () => import('@/views/auth/forgot-password.vue') },
+	{ path: '/reset-password', name: 'ResetPassword', component: () => import('@/views/auth/reset-password.vue') },
+	{ path: '/verify-email', name: 'VerifyEmail', component: () => import('@/views/auth/verify-email.vue') },
+	{ path: '/accept-invitation', name: 'AcceptInvitation', component: () => import('@/views/auth/accept-invitation.vue') },
 	{
 		path: '/',
 		redirect: '/overview',

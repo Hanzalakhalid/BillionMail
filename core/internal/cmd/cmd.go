@@ -7,15 +7,19 @@ import (
 	"billionmail-core/internal/controller/askai"
 	"billionmail-core/internal/controller/batch_mail"
 	"billionmail-core/internal/controller/campaign"
+	companies_ctrl "billionmail-core/internal/controller/companies"
 	"billionmail-core/internal/controller/contact"
 	delivery_log_ctrl "billionmail-core/internal/controller/delivery_log"
 	"billionmail-core/internal/controller/dockerapi"
 	"billionmail-core/internal/controller/domains"
 	"billionmail-core/internal/controller/email_template"
 	"billionmail-core/internal/controller/files"
+	health_ctrl "billionmail-core/internal/controller/health"
+	identity_ctrl "billionmail-core/internal/controller/identity"
 	"billionmail-core/internal/controller/languages"
 	"billionmail-core/internal/controller/mail_boxes"
 	"billionmail-core/internal/controller/mail_services"
+	metawebhook_ctrl "billionmail-core/internal/controller/metawebhook"
 	"billionmail-core/internal/controller/middleware"
 	"billionmail-core/internal/controller/operation_log"
 	"billionmail-core/internal/controller/overview"
@@ -148,54 +152,52 @@ var (
 				safepath = strings.TrimPrefix(safepath, "/")
 			}
 
-			// Start timers
-			err = timers.Start(ctx)
+			managedMode := strings.EqualFold(public.MustGetDockerEnv("SAAS_MANAGED_MODE", "false"), "true")
+			var dk *docker.DockerAPI
+			if !managedMode {
+				// Legacy timers and Docker administration remain exclusive to the
+				// self-hosted control-plane container.
+				if err = timers.Start(ctx); err != nil {
+					g.Log().Error(ctx, "start timers failed ", err)
+					return err
+				}
+				dk, err = docker.NewDockerAPI()
+				if err != nil {
+					g.Log().Error(ctx, "failed to connect to docker-api ", err)
+					return err
+				}
+				defer dk.Close()
 
-			if err != nil {
-				g.Log().Error(ctx, "start timers failed ", err)
-				return err
-			}
-
-			// Connect to Docker
-			dk, err := docker.NewDockerAPI()
-
-			if err != nil {
-				g.Log().Error(ctx, "failed to connect to docker-api ", err)
-				return err
-			}
-
-			defer dk.Close()
-
-			containerName := consts.SERVICES.Core
-			container, err := dk.GetContainerByName(ctx, containerName)
-			if err == nil {
-				if container.Labels != nil {
+				containerName := consts.SERVICES.Core
+				container, containerErr := dk.GetContainerByName(ctx, containerName)
+				if containerErr == nil && container.Labels != nil {
 					workingDir, exists := container.Labels["com.docker.compose.project.working_dir"]
-					if exists {
-						if workingDir != "" {
-							public.HostWorkDir = workingDir
-						}
+					if exists && workingDir != "" {
+						public.HostWorkDir = workingDir
 					}
 				}
 			}
 			if public.HostWorkDir == "" {
 				public.HostWorkDir = public.AbsPath("../")
-				g.Log().Warning(ctx, "HostWorkDir not found via Docker label, using fallback: ", public.HostWorkDir)
+				if !managedMode {
+					g.Log().Warning(ctx, "HostWorkDir not found via Docker label, using fallback: ", public.HostWorkDir)
+				}
 			}
 
 			// Operation log type
 			public.LogTypeMap = consts.GetLogTypeMap()
 
-			// Init Rspamd worker-controller
-			err = rspamd.InitWorkerController()
-
-			if err != nil {
-				g.Log().Warning(ctx, "rspamd init failed ", err)
-				err = nil
+			if !managedMode {
+				if err = rspamd.InitWorkerController(); err != nil {
+					g.Log().Warning(ctx, "rspamd init failed ", err)
+					err = nil
+				}
 			}
 
 			// Create a new server instance
 			s := g.Server(consts.DEFAULT_SERVER_NAME)
+			s.BindHandler("GET:/webhooks/meta/whatsapp", metawebhook_ctrl.Verify)
+			s.BindHandler("POST:/webhooks/meta/whatsapp", metawebhook_ctrl.Receive)
 			webBasePath := configuredWebBasePath()
 
 			// Use Redis for session storage
@@ -210,6 +212,12 @@ var (
 			// Define excluded URIs
 			excludesURIs := map[string]struct{}{
 				"/favicon.ico":                   {},
+				"/health/live":                   {},
+				"/health/ready":                  {},
+				"/api/v1/auth/register":          {},
+				"/api/v1/auth/verify-email":      {},
+				"/api/v1/auth/forgot-password":   {},
+				"/api/v1/auth/reset-password":    {},
 				"/robots.txt":                    {},
 				"/unsubscribe.html":              {},
 				"/unsubscribe_new.html":          {},
@@ -347,9 +355,14 @@ var (
 					push_ctrl.NewV1(),
 					whatsapp_ctrl.NewV1(),
 					delivery_log_ctrl.NewV1(),
+					companies_ctrl.NewV1(),
+					identity_ctrl.NewV1(),
 					ad_intel_ctrl.NewV1(),
 				)
 			})
+
+			s.BindHandler("GET:/health/live", health_ctrl.Live)
+			s.BindHandler("GET:/health/ready", health_ctrl.Ready)
 
 			// Public video landing page (no auth — recipients click from email)
 			s.BindHandler("GET:/landing/video", video_outreach_ctrl.ServeLandingPage)

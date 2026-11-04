@@ -6,7 +6,7 @@ import router from '@/router/router'
 import loadingBar from '@/config/loadingBar'
 
 // Route white list
-const whitePathList = ['/login']
+const whitePathList = ['/login', '/register', '/forgot-password', '/reset-password', '/verify-email']
 
 router.beforeEach(async (to, from, next) => {
 	loadingBar.start()
@@ -46,7 +46,7 @@ router.beforeEach(async (to, from, next) => {
 		// If the visited route is in the white list, go directly
 		next()
 	} else {
-		next('/login')
+		next({ path: '/login', query: { redirect: to.fullPath } })
 	}
 })
 

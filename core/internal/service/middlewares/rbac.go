@@ -24,7 +24,7 @@ func PathToRouteInfo(path string) (module, action, resource string) {
 		"contact", "email_template", "batch_mail", "files",
 		"abnormal_recipient", "languages", "mail_services",
 		"relay", "settings", "subscribe_list", "operation_log",
-		"askai", "tags", "video_outreach", "sms", "push", "whatsapp", "delivery_log", "ad_intel",
+		"askai", "tags", "video_outreach", "sms", "push", "whatsapp", "delivery_log", "ad_intel", "companies",
 	}
 	for _, m := range modules {
 		if strings.Contains(path, "/"+m+"/") || strings.HasSuffix(path, "/"+m) {
@@ -34,7 +34,7 @@ func PathToRouteInfo(path string) (module, action, resource string) {
 	}
 
 	// Extract action and resource
-	pattern := `/api/(\w+)/(\w+)(?:/.*)?`
+	pattern := `/api/(?:v1/)?(\w+)/(\w+)(?:/.*)?`
 	match, err := gregex.MatchString(pattern, path)
 	if err == nil && len(match) >= 3 {
 		resource = match[1]
@@ -72,6 +72,16 @@ func NewRBACMiddleware() *RBACMiddleware {
 
 // PermissionCheck checks if the current user has the required permission
 func (m *RBACMiddleware) PermissionCheck(r *ghttp.Request) {
+	if strings.HasPrefix(r.URL.Path, "/api/v1/auth/") {
+		r.Middleware.Next()
+		return
+	}
+	// Versioned SaaS endpoints enforce workspace permissions in their services.
+	// They must not inherit the legacy installation-wide role matrix.
+	if strings.HasPrefix(r.URL.Path, "/api/v1/companies/") {
+		r.Middleware.Next()
+		return
+	}
 	// Skip permission check for public/auth routes (must match jwt.go bypass list)
 	if r.URL.Path == "/api/login" ||
 		r.URL.Path == "/api/aapanel/sso" ||

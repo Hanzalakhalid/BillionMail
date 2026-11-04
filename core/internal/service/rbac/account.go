@@ -241,6 +241,9 @@ func (s *accountService) Login(ctx context.Context, username, password string) (
 	if err != nil {
 		return nil, err
 	}
+	if account.AccountId == 0 || account.Status != 1 {
+		return nil, fmt.Errorf("invalid username or password")
+	}
 
 	// Verify password
 	err = bcrypt.CompareHashAndPassword([]byte(account.Password), []byte(password))

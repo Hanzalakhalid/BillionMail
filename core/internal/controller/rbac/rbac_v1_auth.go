@@ -5,11 +5,13 @@ import (
 	"billionmail-core/internal/consts"
 	"billionmail-core/internal/service/public"
 	service "billionmail-core/internal/service/rbac"
+	"billionmail-core/internal/service/tenancy"
 	"context"
 	"fmt"
 	"github.com/gogf/gf/util/gconv"
 	"github.com/gogf/gf/v2/errors/gerror"
 	"github.com/gogf/gf/v2/frame/g"
+	"github.com/google/uuid"
 	"time"
 )
 
@@ -98,17 +100,27 @@ func (c *ControllerV1) Login(ctx context.Context, req *v1.LoginReq) (res *v1.Log
 		roleNames = append(roleNames, role.RoleName)
 	}
 
-	// Generate JWT token
-	token, _, err := service.JWT().GenerateToken(account.AccountId, account.Username, roleNames)
+	user, err := tenancy.UserForAccount(ctx, account.AccountId)
 	if err != nil {
-		res.SetError(gerror.New("Failed to generate token"))
+		res.SetError(gerror.New("Failed to resolve workspace user"))
+		return
+	}
+	tenant, err := tenancy.DefaultMembership(ctx, account.AccountId)
+	if err != nil {
+		res.SetError(gerror.New("No active company workspace"))
+		return
+	}
+	request := g.RequestFromCtx(ctx)
+	session, refreshToken, err := tenancy.CreateSession(ctx, user.ID, tenant.CompanyID, request.Header.Get("User-Agent"), clientIp, service.JWT().RefreshExpiry)
+	if err != nil {
+		res.SetError(gerror.New("Failed to create login session"))
 		return
 	}
 
-	// Generate refresh token
-	refreshToken, err := service.JWT().GenerateRefreshToken(account.AccountId, account.Username)
+	// Generate an access token bound to the active membership and session.
+	token, _, err := service.JWT().GenerateTenantToken(account.AccountId, account.Username, roleNames, tenant, session.ID)
 	if err != nil {
-		res.SetError(gerror.New("Failed to generate refresh token"))
+		res.SetError(gerror.New("Failed to generate token"))
 		return
 	}
 
@@ -126,6 +138,8 @@ func (c *ControllerV1) Login(ctx context.Context, req *v1.LoginReq) (res *v1.Log
 	res.Data.AccountInfo.Email = account.Email
 	res.Data.AccountInfo.Status = account.Status
 	res.Data.AccountInfo.Lang = account.Language
+	res.Data.ActiveCompany.Id = tenant.CompanyID.String()
+	res.Data.ActiveCompany.Role = tenant.Role
 
 	loginSuccessFlag = true
 
@@ -154,6 +168,11 @@ func (c *ControllerV1) Logout(ctx context.Context, req *v1.LogoutReq) (res *v1.L
 		err = fmt.Errorf("Logout failed: %w", err)
 		return
 	}
+	if claims.SessionID != "" {
+		if sessionID, parseErr := uuid.Parse(claims.SessionID); parseErr == nil {
+			_ = tenancy.RevokeSession(ctx, sessionID, "logout")
+		}
+	}
 
 	// Destroy the session
 	_ = g.RequestFromCtx(ctx).Session.RemoveAll()
@@ -173,20 +192,28 @@ func (c *ControllerV1) RefreshToken(ctx context.Context, req *v1.RefreshTokenReq
 	res = &v1.RefreshTokenRes{}
 
 	// Verify refresh token
-	claims, err := service.JWT().ParseToken(req.RefreshToken)
+	session, refreshToken, err := tenancy.RotateSession(ctx, req.RefreshToken, service.JWT().RefreshExpiry)
 	if err != nil {
 		res.SetError(gerror.New("Invalid or expired refresh token"))
 		return
 	}
 
 	// Validate token type — only accept refresh tokens
-	if claims.Subject != "refresh_token" {
-		res.SetError(gerror.New("Invalid token type"))
+	user, err := tenancy.UserByID(ctx, session.UserID)
+	if err != nil {
+		res.SetError(gerror.New("Invalid session user"))
 		return
 	}
+	tenant, err := tenancy.Membership(ctx, session.UserID, session.ActiveCompanyID)
+	if err != nil {
+		_ = tenancy.RevokeSession(ctx, session.ID, "membership_invalid")
+		res.SetError(gerror.New("Active company membership is no longer valid"))
+		return
+	}
+	tenant.AccountID = user.LegacyAccountID
 
 	// Get account roles from database
-	roles, roleErr := service.Account().GetAccountRoles(ctx, claims.AccountId)
+	roles, roleErr := service.Account().GetAccountRoles(ctx, user.LegacyAccountID)
 	if roleErr != nil {
 		res.SetError(gerror.New("Failed to get account roles"))
 		return
@@ -197,16 +224,9 @@ func (c *ControllerV1) RefreshToken(ctx context.Context, req *v1.RefreshTokenReq
 	}
 
 	// Generate new JWT token
-	token, _, err := service.JWT().GenerateToken(claims.AccountId, claims.Username, roleNames)
+	token, _, err := service.JWT().GenerateTenantToken(user.LegacyAccountID, user.Username, roleNames, tenant, session.ID)
 	if err != nil {
 		res.SetError(gerror.New("Failed to generate token"))
-		return
-	}
-
-	// Generate new refresh token
-	refreshToken, err := service.JWT().GenerateRefreshToken(claims.AccountId, claims.Username)
-	if err != nil {
-		res.SetError(gerror.New("Failed to generate refresh token"))
 		return
 	}
 
@@ -217,6 +237,7 @@ func (c *ControllerV1) RefreshToken(ctx context.Context, req *v1.RefreshTokenReq
 	res.Data.Token = token
 	res.Data.RefreshToken = refreshToken
 	res.Data.TTL = gconv.Int64(service.JWT().AccessExpiry.Seconds())
+	res.Data.ActiveCompanyId = tenant.CompanyID.String()
 
 	return
 }

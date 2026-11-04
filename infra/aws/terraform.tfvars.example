@@ -1,0 +1,14 @@
+aws_region        = "us-east-1"
+environment       = "production"
+application_image = "123456789012.dkr.ecr.us-east-1.amazonaws.com/billionmail@sha256:replace-with-image-digest"
+certificate_arn   = "arn:aws:acm:us-east-1:123456789012:certificate/replace-me"
+public_url        = "https://app.example.com"
+from_email        = "noreply@example.com"
+ses_identity_arn  = "arn:aws:ses:us-east-1:123456789012:identity/example.com"
+meta_secret_arn   = "arn:aws:secretsmanager:us-east-1:123456789012:secret:billionmail/meta-app-replace-me"
+cloudfront_public_key_pem = <<-PEM
+-----BEGIN PUBLIC KEY-----
+REPLACE_WITH_CLOUDFRONT_SIGNING_PUBLIC_KEY
+-----END PUBLIC KEY-----
+PEM
+alert_email       = "platform@example.com"

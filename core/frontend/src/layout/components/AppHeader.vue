@@ -11,6 +11,7 @@
 		</div>
 
 		<div class="header-right">
+			<CompanySwitcher />
 			<n-button class="icon-btn" :bordered="false" @click="handleSetTheme">
 				<i class="icon" :class="theme === 'light' ? 'i-ri-sun-line' : 'i-ri-moon-line'"></i>
 			</n-button>
@@ -41,6 +42,7 @@ import { storeToRefs } from 'pinia'
 import { DropdownOption } from 'naive-ui'
 import { useUserStore, useGlobalStore, useThemeStore } from '@/store'
 import InstanceSwitcher from './InstanceSwitcher.vue'
+import CompanySwitcher from './CompanySwitcher.vue'
 import { getVersionInfo } from '@/api/modules/settings'
 import { isObject } from '@/utils'
 

@@ -29,6 +29,10 @@ type LoginRes struct {
 			Status   int    `json:"status" dc:"Account status"`
 			Lang     string `json:"lang" dc:"Preferred language"`
 		} `json:"accountInfo" dc:"Basic account information"`
+		ActiveCompany struct {
+			Id   string `json:"id"`
+			Role string `json:"role"`
+		} `json:"activeCompany"`
 	} `json:"data"`
 }
 
@@ -76,9 +80,10 @@ type RefreshTokenReq struct {
 type RefreshTokenRes struct {
 	api_v1.StandardRes
 	Data struct {
-		Token        string `json:"token" dc:"New JWT token"`
-		RefreshToken string `json:"refreshToken" dc:"New refresh token"`
-		TTL          int64  `json:"ttl" dc:"Token lifetime (in seconds)"`
+		Token           string `json:"token" dc:"New JWT token"`
+		RefreshToken    string `json:"refreshToken" dc:"New refresh token"`
+		TTL             int64  `json:"ttl" dc:"Token lifetime (in seconds)"`
+		ActiveCompanyId string `json:"activeCompanyId" dc:"Active company ID"`
 	} `json:"data"`
 }
 

@@ -43,25 +43,26 @@ describe('UserStore', () => {
     expect(store.login.expire).toBe(0)
   })
 
-  describe('isLogin', () => {
-    it('returns false when no token', () => {
-      const store = useUserStore()
-      expect(store.isLogin).toBeFalsy()
-    })
+	  describe('isLogin', () => {
+	    it('returns false when no token', () => {
+	      const store = useUserStore()
+	      expect(store.isLogin).toBeFalsy()
+	    })
 
-    it('returns false when token is set but expired', () => {
-      const store = useUserStore()
-      store.login.token = 'some-token'
-      store.login.expire = Date.now() - 1000 // expired 1 second ago
-      expect(store.isLogin).toBeFalsy()
-    })
+	    it('keeps the session active when access token expired but refresh token exists', () => {
+	      const store = useUserStore()
+	      store.login.token = 'some-token'
+	      store.login.refresh_token = 'some-refresh-token'
+	      store.login.expire = Date.now() - 1000 // expired 1 second ago
+	      expect(store.isLogin).toBeTruthy()
+	    })
 
-    it('returns true when token is set and not expired', () => {
-      const store = useUserStore()
-      store.login.token = 'some-token'
-      store.login.expire = Date.now() + 60000 // expires in 60 seconds
-      expect(store.isLogin).toBeTruthy()
-    })
+	    it('does not treat an access token without a refresh session as logged in', () => {
+	      const store = useUserStore()
+	      store.login.token = 'some-token'
+	      store.login.expire = Date.now() + 60000 // expires in 60 seconds
+	      expect(store.isLogin).toBeFalsy()
+	    })
   })
 
   describe('setLoginInfo', () => {

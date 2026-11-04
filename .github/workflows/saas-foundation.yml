@@ -1,0 +1,99 @@
+name: SaaS foundation
+
+on:
+  pull_request:
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: saas-foundation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.4-alpine
+        env:
+          POSTGRES_USER: billionmail
+          POSTGRES_PASSWORD: integration-secret
+          POSTGRES_DB: billionmail_tenant_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U billionmail -d billionmail_tenant_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: core
+    env:
+      BM_TEST_DB_PASSWORD: integration-secret
+      BM_TEST_DB_USER: billionmail
+      BM_TEST_DB_NAME: billionmail_tenant_test
+      BM_TEST_DB_HOST: 127.0.0.1
+      BM_TEST_DB_PORT: "5432"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: core/go.mod
+          cache-dependency-path: core/go.sum
+      - name: Verify formatting
+        run: test -z "$(gofmt -l internal/migrations internal/service/tenancy internal/service/platform internal/service/identity internal/service/queue internal/service/notifications internal/service/secrets internal/service/whatsappchannel internal/service/whatsappwebhook internal/service/database_initialization internal/service/redis_initialization internal/controller/companies internal/controller/identity internal/controller/health internal/controller/metawebhook internal/cmd api/companies api/identity cmd/saas-worker)"
+      - name: Vet foundation packages
+        run: go vet ./internal/migrations ./internal/service/tenancy ./internal/service/platform ./internal/service/identity ./internal/service/queue ./internal/service/notifications ./internal/service/secrets ./internal/service/whatsappchannel ./internal/service/whatsappwebhook ./internal/service/database_initialization ./internal/service/redis_initialization ./internal/controller/companies ./internal/controller/identity ./internal/controller/metawebhook ./internal/service/rbac ./internal/controller/rbac ./cmd/saas-worker
+      - name: Unit and integration tests
+        run: go test -count=1 ./internal/migrations ./internal/service/tenancy ./internal/service/platform ./internal/service/identity ./internal/service/queue ./internal/service/notifications ./internal/service/secrets ./internal/service/whatsappchannel ./internal/service/whatsappwebhook ./internal/service/database_initialization ./internal/service/redis_initialization ./internal/controller/companies ./internal/controller/identity ./internal/controller/metawebhook ./internal/service/rbac ./internal/controller/rbac
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: core/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.28.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: core/frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm test
+
+  infrastructure:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: infra/aws
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.14.4
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          exit-code: "1"

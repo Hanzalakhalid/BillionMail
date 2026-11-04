@@ -3,6 +3,7 @@ package rbac
 import (
 	"billionmail-core/internal/consts"
 	"billionmail-core/internal/service/public"
+	"billionmail-core/internal/service/tenancy"
 	"context"
 	"fmt"
 	"github.com/gogf/gf/v2/util/gconv"
@@ -14,14 +15,21 @@ import (
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/gogf/gf/v2/net/ghttp"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 )
 
 // JWTCustomClaims defines the custom claims for JWT
 type JWTCustomClaims struct {
-	AccountId int64    `json:"accountId"`
-	Username  string   `json:"username"`
-	Roles     []string `json:"roles"`
-	ApiToken  bool     `json:"apiToken"`
+	AccountId         int64    `json:"accountId"`
+	UserID            string   `json:"userId,omitempty"`
+	CompanyID         string   `json:"companyId,omitempty"`
+	MembershipID      string   `json:"membershipId,omitempty"`
+	SessionID         string   `json:"sessionId,omitempty"`
+	MembershipVersion int64    `json:"membershipVersion,omitempty"`
+	CompanyRole       string   `json:"companyRole,omitempty"`
+	Username          string   `json:"username"`
+	Roles             []string `json:"roles"`
+	ApiToken          bool     `json:"apiToken"`
 	jwt.RegisteredClaims
 }
 
@@ -50,9 +58,32 @@ func newJWTService() *JWTService {
 
 	return &JWTService{
 		Secret:        g.Cfg().MustGet(context.Background(), "jwt.secret", defaultJwtSecret).String(),
-		AccessExpiry:  time.Duration(g.Cfg().MustGet(context.Background(), "jwt.accessExpiry", 86400).Int()) * time.Second,
+		AccessExpiry:  time.Duration(g.Cfg().MustGet(context.Background(), "jwt.accessExpiry", 900).Int()) * time.Second,
 		RefreshExpiry: time.Duration(g.Cfg().MustGet(context.Background(), "jwt.refreshExpiry", 86400*7).Int()) * time.Second,
 	}
+}
+
+// GenerateTenantToken creates a short-lived access token bound to one active
+// membership and one revocable refresh session.
+func (s *JWTService) GenerateTenantToken(accountID int64, username string, roles []string, tenant tenancy.TenantContext, sessionID uuid.UUID) (string, int64, error) {
+	expiryTime := time.Now().Add(s.AccessExpiry)
+	claims := &JWTCustomClaims{
+		AccountId: accountID, UserID: tenant.UserID.String(), CompanyID: tenant.CompanyID.String(),
+		MembershipID: tenant.MembershipID.String(), SessionID: sessionID.String(),
+		MembershipVersion: tenant.MembershipVersion, CompanyRole: tenant.Role,
+		Username: username, Roles: roles,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(expiryTime), IssuedAt: jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()), Issuer: consts.DEFAULT_SERVER_NAME,
+			Subject: "access_token", ID: guid.S() + guid.S(),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString([]byte(s.Secret))
+	if err != nil {
+		return "", 0, err
+	}
+	return signedToken, expiryTime.Unix(), nil
 }
 
 // GenerateToken generates a new JWT token
@@ -138,7 +169,7 @@ func (s *JWTService) ParseToken(tokenString string) (*JWTCustomClaims, error) {
 
 	token, err := jwt.ParseWithClaims(tokenString, &JWTCustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return []byte(s.Secret), nil
-	})
+	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}), jwt.WithIssuer(consts.DEFAULT_SERVER_NAME))
 
 	if err != nil {
 		return nil, err
@@ -187,6 +218,10 @@ func (s *JWTService) IsTokenBlacklisted(token *JWTCustomClaims) bool {
 
 // JWTAuthMiddleware provides JWT authentication middleware
 func (s *JWTService) JWTAuthMiddleware(r *ghttp.Request) {
+	if strings.HasPrefix(r.URL.Path, "/api/v1/auth/") {
+		r.Middleware.Next()
+		return
+	}
 	// Skip authentication for login and refresh token endpoints
 	if r.URL.Path == "/api/login" ||
 		r.URL.Path == "/api/aapanel/sso" ||
@@ -233,6 +268,69 @@ func (s *JWTService) JWTAuthMiddleware(r *ghttp.Request) {
 	r.SetCtxVar("accountId", claims.AccountId)
 	r.SetCtxVar("username", claims.Username)
 
+	// Resolve and validate the active workspace. Legacy and API tokens are
+	// attached to their first active company during the compatibility window.
+	var tenant tenancy.TenantContext
+	if claims.UserID != "" && claims.CompanyID != "" {
+		userID, userErr := uuid.Parse(claims.UserID)
+		companyID, companyErr := uuid.Parse(claims.CompanyID)
+		if userErr != nil || companyErr != nil {
+			r.Response.WriteJson(resp)
+			r.Exit()
+			return
+		}
+		tenant, err = tenancy.Membership(r.GetCtx(), userID, companyID)
+		if err != nil || tenant.MembershipVersion != claims.MembershipVersion {
+			r.Response.WriteJson(resp)
+			r.Exit()
+			return
+		}
+		if claims.SessionID != "" {
+			sessionID, sessionErr := uuid.Parse(claims.SessionID)
+			if sessionErr != nil {
+				r.Response.WriteJson(resp)
+				r.Exit()
+				return
+			}
+			count, sessionErr := g.DB().Model("auth_sessions").Where("id", sessionID).Where("user_id", userID).WhereNull("revoked_at").WhereGT("expires_at", time.Now().UTC()).Count()
+			if sessionErr != nil || count != 1 {
+				r.Response.WriteJson(resp)
+				r.Exit()
+				return
+			}
+		}
+	} else {
+		tenant, err = tenancy.DefaultMembership(r.GetCtx(), claims.AccountId)
+		if err != nil {
+			r.Response.WriteJson(resp)
+			r.Exit()
+			return
+		}
+	}
+	tenant.AccountID = claims.AccountId
+	r.SetCtx(tenancy.WithContext(r.GetCtx(), tenant))
+	r.SetCtxVar("companyId", tenant.CompanyID.String())
+	r.SetCtxVar("userId", tenant.UserID.String())
+	r.SetCtxVar("companyRole", tenant.Role)
+
+	// Legacy repositories are not company-scoped yet. Fail closed for every
+	// non-default workspace until an endpoint has moved under the versioned,
+	// tenant-aware API surface. This keeps migrated mail data reachable only
+	// from the single legacy workspace during the compatibility window.
+	if !isTenantAwarePath(r.URL.Path) {
+		legacyDefault, queryErr := g.DB().Model("companies").Where("id", tenant.CompanyID).Value("is_legacy_default")
+		managedDeployment := strings.EqualFold(public.MustGetDockerEnv("SAAS_MANAGED_MODE", "false"), "true")
+		if queryErr != nil || managedDeployment || !legacyDefault.Bool() {
+			r.Response.Status = 403
+			r.Response.WriteJson(g.Map{
+				"code": 403, "success": false,
+				"msg": "This feature is not yet available in this workspace",
+			})
+			r.Exit()
+			return
+		}
+	}
+
 	// Retrieve roles from cache or database
 	cacheKey := fmt.Sprintf("ACCOUNT_ROLES_%d", claims.AccountId)
 	roles := public.GetCache(cacheKey)
@@ -258,4 +356,8 @@ func (s *JWTService) JWTAuthMiddleware(r *ghttp.Request) {
 	}
 
 	r.Middleware.Next()
+}
+
+func isTenantAwarePath(path string) bool {
+	return strings.HasPrefix(path, "/api/v1/") || path == "/api/logout"
 }

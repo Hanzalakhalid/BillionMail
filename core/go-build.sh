@@ -55,11 +55,12 @@ if [[ "$PLATFORMS" == "all" || "$PLATFORMS" == "x86" ]]; then
 
     # amd64
     echo "build start amd64"
-    rm -f billionmail-amd64
+    rm -f billionmail-amd64 saas-worker-amd64
     export GOOS=linux
     export GOARCH=amd64
     go build -ldflags="-s -w" -o billionmail-amd64 main.go
-    if [ ! -f "billionmail-amd64" ]; then
+    go build -ldflags="-s -w" -o saas-worker-amd64 ./cmd/saas-worker
+    if [ ! -f "billionmail-amd64" ] || [ ! -f "saas-worker-amd64" ]; then
         echo "build amd64 failed"
         exit 1
     fi
@@ -74,11 +75,12 @@ fi
 if [[ "$PLATFORMS" == "all" || "$PLATFORMS" == "arm" ]]; then
     # arm64
     echo "build start arm64"
-    rm -f billionmail-arm64
+    rm -f billionmail-arm64 saas-worker-arm64
     export GOOS=linux
     export GOARCH=arm64
     go build -ldflags="-s -w" -o billionmail-arm64 main.go
-    if [ ! -f "billionmail-arm64" ]; then
+    go build -ldflags="-s -w" -o saas-worker-arm64 ./cmd/saas-worker
+    if [ ! -f "billionmail-arm64" ] || [ ! -f "saas-worker-arm64" ]; then
         echo "build arm64 failed"
         exit 1
     fi
@@ -89,4 +91,4 @@ if [[ "$PLATFORMS" == "all" || "$PLATFORMS" == "arm" ]]; then
     fi
 fi
 
-ls -al billionmail-*
+ls -al billionmail-* saas-worker-*

@@ -3,10 +3,12 @@ package redis_initialization
 import (
 	"billionmail-core/internal/service/public"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"github.com/gogf/gf/v2/database/gredis"
 	"github.com/gogf/gf/v2/frame/g"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -27,18 +29,23 @@ func InitRedis() (err error) {
 		}
 	}
 
-	address := "127.0.0.1:26379"
+	address := public.MustGetDockerEnv("REDIS_ADDR", "127.0.0.1:26379")
 
-	if public.IsRunningInContainer() {
+	if public.IsRunningInContainer() && address == "127.0.0.1:26379" {
 		address = "redis:6379"
 	}
 
 	// Initialize Redis configuration
-	gredis.SetConfig(&gredis.Config{
+	redisConfig := &gredis.Config{
 		Address: address,
 		Db:      db,
 		Pass:    passwd,
-	})
+	}
+	if strings.EqualFold(public.MustGetDockerEnv("REDIS_TLS", "false"), "true") {
+		redisConfig.TLS = true
+		redisConfig.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	}
+	gredis.SetConfig(redisConfig)
 
 	// Testing redis connection until it successful
 	connectionOK := false

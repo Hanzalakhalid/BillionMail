@@ -24,6 +24,7 @@ var ExcludedPaths = map[string]struct{}{
 	"/api/batch_mail/api/batch_send": {},
 	"/api/subscribe/submit":          {},
 	"/api/subscribe/confirm":         {},
+	"/webhooks/meta/whatsapp":        {},
 	"/already_subscribed.html":       {},
 	"/subscribe_confirm.html":        {},
 	"/subscribe_form.html":           {},

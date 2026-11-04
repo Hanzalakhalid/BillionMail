@@ -20,7 +20,7 @@ export default defineStore(
 		 * @description Determine if the user is logged in
 		 */
 		const isLogin = computed(() => {
-			return login.value.token && login.value.expire > Date.now()
+			return !!login.value.refresh_token
 		})
 
 		/**
@@ -41,6 +41,12 @@ export default defineStore(
 			login.value.expire = 0
 		}
 
+		const replaceAccessToken = (token: string, ttl: number) => {
+			login.value.token = token
+			login.value.ttl = ttl
+			login.value.expire = ttl * 1000 + Date.now()
+		}
+
 		const logout = () => {
 			confirm({
 				title: t('user.logout.title'),
@@ -59,6 +65,7 @@ export default defineStore(
 			logout,
 			setLoginInfo,
 			resetLoginInfo,
+			replaceAccessToken,
 		}
 	},
 	{

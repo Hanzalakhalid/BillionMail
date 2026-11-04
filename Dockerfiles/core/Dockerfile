@@ -10,6 +10,7 @@ ENV LC_ALL=C.UTF-8
 # Platform-specific binary copy
 ARG TARGETARCH
 COPY core/billionmail-${TARGETARCH} /opt/billionmail/core/billionmail
+COPY core/saas-worker-${TARGETARCH} /opt/billionmail/core/saas-worker
 COPY core/manifest /opt/billionmail/core/manifest
 COPY core/languages /opt/billionmail/core/languages
 COPY core/public /opt/billionmail/core/public
@@ -36,7 +37,7 @@ RUN apk add --no-cache \
     iptables \
     ipset \
     && rm -rf /var/cache/apk/* \
-    && chmod +x /stop-supervisor.sh /core.sh /restart_fail2ban.sh /opt/billionmail/core/billionmail
+    && chmod +x /stop-supervisor.sh /core.sh /restart_fail2ban.sh /opt/billionmail/core/billionmail /opt/billionmail/core/saas-worker
 
 # Copy file
 

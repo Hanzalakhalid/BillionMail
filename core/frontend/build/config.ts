@@ -5,6 +5,11 @@ interface ServerConfig {
 }
 
 const serverConfig: Record<string, ServerConfig> = {
+	localhost: {
+		https: false,
+		address: 'http://127.0.0.1:8090',
+		host: '127.0.0.1',
+	},
 	'192.168.66.66': {
 		https: false,
 		address: 'http://192.168.66.66:64325',

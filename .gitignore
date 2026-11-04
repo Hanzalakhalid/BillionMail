@@ -35,6 +35,8 @@ conf/rspamd/local.d/redis.conf
 ssl-self-signed/cert.pem
 ssl-self-signed/key.pem
 core/billionmail*
+core/saas-worker-*
+core/etc/
 
 # Claude Code
 .claude/
@@ -47,3 +49,8 @@ core/frontend/coverage/
 
 # Python
 __pycache__/
+# Terraform provider downloads and local state
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log

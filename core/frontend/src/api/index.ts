@@ -22,7 +22,33 @@ const instance = axios.create({
 	},
 })
 
-const whitePathList = ['/login']
+const whitePathList = [
+	'/login', '/refresh-token', '/v1/auth/register', '/v1/auth/verify-email',
+	'/v1/auth/forgot-password', '/v1/auth/reset-password',
+]
+
+let refreshPromise: Promise<string> | null = null
+
+const refreshAccessToken = async (): Promise<string> => {
+	if (refreshPromise) return refreshPromise
+	const userStore = useUserStore()
+	refreshPromise = axios
+		.post(`${apiUrlPrefix}/api/refresh-token`, { refreshToken: userStore.login.refresh_token })
+		.then(response => {
+			const payload = response.data?.data
+			if (!response.data?.success || !payload?.token || !payload?.refreshToken) {
+				throw new Error('Refresh token rejected')
+			}
+			userStore.setLoginInfo({
+				token: payload.token,
+				refresh_token: payload.refreshToken,
+				ttl: payload.ttl,
+			})
+			return payload.token as string
+		})
+		.finally(() => { refreshPromise = null })
+	return refreshPromise
+}
 
 // 存储所有请求的 AbortController
 const controllerStore = new Map<string, AbortController>()
@@ -89,10 +115,10 @@ instance.interceptors.request.use(config => {
 
 // 成功、失败处理
 instance.interceptors.response.use(
-	response => {
+	async response => {
 		removeController(response.config)
 
-		const { fetchOptions } = response.config
+		const fetchOptions = response.config.fetchOptions as FetchOptions | undefined
 		const { code, data, msg, success } = response.data || {}
 
 		if (fetchOptions?.cancelResInterceptor) {
@@ -132,8 +158,21 @@ instance.interceptors.response.use(
 		}
 		if (code === 401) {
 			const userStore = useUserStore()
-			userStore.resetLoginInfo()
-			router.push('/login')
+			const retryConfig = response.config as AxiosRequestConfig & { _retry?: boolean }
+			if (!retryConfig._retry && userStore.login.refresh_token && !retryConfig.url?.includes('/refresh-token')) {
+				retryConfig._retry = true
+				try {
+					const token = await refreshAccessToken()
+					retryConfig.headers = { ...retryConfig.headers, Authorization: `Bearer ${token}` }
+					return instance.request(retryConfig)
+				} catch {
+					userStore.resetLoginInfo()
+					router.push('/login')
+				}
+			} else {
+				userStore.resetLoginInfo()
+				router.push('/login')
+			}
 		}
 		return Promise.reject(response.data)
 	},

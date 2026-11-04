@@ -2,11 +2,13 @@ package database_initialization
 
 import (
 	"billionmail-core/internal/consts"
+	"billionmail-core/internal/migrations"
 	"billionmail-core/internal/service/public"
 	"context"
 	"fmt"
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
+	"strconv"
 	"time"
 )
 
@@ -20,18 +22,31 @@ func InitDatabase() (err error) {
 		return fmt.Errorf("Read database password failed: %v", err)
 	}
 
-	// Setting database configuration
+	dbHost := public.MustGetDockerEnv("DB_HOST", public.AbsPath(consts.POSTGRESQL_SOCK))
+	dbPort := public.MustGetDockerEnv("DB_PORT", "")
+	dbUser := public.MustGetDockerEnv("DBUSER", "billionmail")
+	dbName := public.MustGetDockerEnv("DBNAME", "billionmail")
+	dbSSLMode := public.MustGetDockerEnv("DB_SSLMODE", "disable")
+	maxConnections, parseErr := strconv.Atoi(public.MustGetDockerEnv("DB_MAX_OPEN_CONNECTIONS", "100"))
+	if parseErr != nil || maxConnections < 1 {
+		return fmt.Errorf("DB_MAX_OPEN_CONNECTIONS must be a positive integer")
+	}
+
+	// Runtime connection settings support both the existing Unix socket and
+	// managed PostgreSQL services such as RDS.
 	err = gdb.SetConfig(gdb.Config{
 		"default": gdb.ConfigGroup{
 			gdb.ConfigNode{
 				// Debug: true,
-				Host:             public.AbsPath(consts.POSTGRESQL_SOCK),
-				User:             "billionmail",
+				Host:             dbHost,
+				Port:             dbPort,
+				User:             dbUser,
 				Pass:             dbPass,
-				Name:             "billionmail",
+				Name:             dbName,
 				Type:             "pgsql",
+				Extra:            "sslmode=" + dbSSLMode,
 				Role:             "master",
-				MaxOpenConnCount: 100,
+				MaxOpenConnCount: maxConnections,
 			},
 		},
 	})
@@ -70,6 +85,11 @@ func InitDatabase() (err error) {
 
 	// Empty the registered handlers
 	registeredHandlers = registeredHandlers[:0]
+
+	// Apply versioned SaaS migrations only after legacy bootstrap tables exist.
+	if err = migrations.Up(context.Background()); err != nil {
+		return err
+	}
 
 	return nil
 }

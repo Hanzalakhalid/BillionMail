@@ -121,6 +121,7 @@ const iconMap: Record<string, VNodeChild> = {
 	sms: <i class="i-mdi-message-text-outline"></i>,
 	push: <i class="i-mdi-bell-outline"></i>,
 	whatsapp: <i class="i-mdi-whatsapp"></i>,
+	team: <i class="i-mdi-account-group-outline"></i>,
 	logout: <i class="i-mdi-logout"></i>,
 }
 

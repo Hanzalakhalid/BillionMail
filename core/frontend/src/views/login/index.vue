@@ -55,6 +55,10 @@
 					</n-button>
 				</n-form-item>
 			</n-form>
+			<div class="login-links">
+				<router-link to="/forgot-password">Forgot password?</router-link>
+				<router-link to="/register">Create workspace</router-link>
+			</div>
 		</div>
 	</div>
 </template>
@@ -128,7 +132,8 @@ const loading = ref(false)
 
 interface LoginResponse {
 	token: string
-	refresh_token: string
+	refreshToken?: string
+	refresh_token?: string
 	ttl: number
 }
 
@@ -140,11 +145,13 @@ const handleLogin = async () => {
 		if (isObject<LoginResponse>(res)) {
 			userStore.setLoginInfo({
 				token: res.token,
-				refresh_token: res.refresh_token,
+				refresh_token: res.refreshToken ?? res.refresh_token ?? '',
 				ttl: res.ttl,
 			})
 			setTimeout(() => {
-				router.push('/')
+				const redirect = typeof router.currentRoute.value.query.redirect === 'string'
+					? router.currentRoute.value.query.redirect : '/'
+				router.push(redirect)
 			}, 1000)
 		}
 	} catch {
@@ -206,6 +213,12 @@ getCode()
 	border-radius: 8px;
 	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
 	z-index: 1;
+}
+
+.login-links {
+	display: flex;
+	justify-content: space-between;
+	margin-top: 16px;
 }
 
 .logo {
