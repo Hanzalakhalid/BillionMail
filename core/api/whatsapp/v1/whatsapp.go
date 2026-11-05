@@ -2,10 +2,35 @@ package v1
 
 import (
 	"billionmail-core/internal/service/whatsapp"
+	"billionmail-core/internal/service/whatsappchannel"
 	"billionmail-core/utility/types/api_v1"
 
 	"github.com/gogf/gf/v2/frame/g"
 )
+
+type ListChannelsReq struct {
+	g.Meta `path:"/v1/whatsapp/channels" method:"get" tags:"WhatsApp" summary:"List company WhatsApp channels"`
+}
+
+type ListChannelsRes struct {
+	api_v1.StandardRes
+	Data []whatsappchannel.Channel `json:"data"`
+}
+
+type ConnectChannelReq struct {
+	g.Meta        `path:"/v1/whatsapp/channels/connect" method:"post" tags:"WhatsApp" summary:"Connect a company WhatsApp Cloud API number"`
+	WABAID        string `json:"waba_id" v:"required|max-length:128"`
+	BusinessName  string `json:"business_name" v:"max-length:255"`
+	PhoneNumberID string `json:"phone_number_id" v:"required|max-length:128"`
+	DisplayPhone  string `json:"display_phone_number" v:"max-length:40"`
+	VerifiedName  string `json:"verified_name" v:"max-length:255"`
+	AccessToken   string `json:"access_token" v:"required"`
+}
+
+type ConnectChannelRes struct {
+	api_v1.StandardRes
+	Data whatsappchannel.Connection `json:"data"`
+}
 
 type GetConfigReq struct {
 	g.Meta        `path:"/whatsapp/config" method:"get" tags:"WhatsApp" summary:"Get WhatsApp Cloud API settings"`

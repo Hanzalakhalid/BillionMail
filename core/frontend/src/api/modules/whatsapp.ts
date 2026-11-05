@@ -29,6 +29,32 @@ export interface WhatsappLog {
 	create_time: number
 }
 
+export interface WhatsappChannel {
+	id: string
+	account_id: string
+	waba_id: string
+	business_name: string
+	phone_number_id: string
+	display_phone_number: string
+	verified_name: string
+	status: string
+}
+
+export interface ConnectWhatsappChannel {
+	waba_id: string
+	business_name: string
+	phone_number_id: string
+	display_phone_number: string
+	verified_name: string
+	access_token: string
+}
+
+export const getWhatsappChannels = () => instance.get('/v1/whatsapp/channels')
+export const connectWhatsappChannel = (data: ConnectWhatsappChannel) =>
+	instance.post('/v1/whatsapp/channels/connect', data, {
+		fetchOptions: { loading: 'Connecting WhatsApp...', successMessage: true },
+	})
+
 interface TemplateFields {
 	template: string
 	language: string

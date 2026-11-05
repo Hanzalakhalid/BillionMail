@@ -34,6 +34,42 @@ type TemplateInfo struct {
 	Body     string `json:"body"`
 }
 
+// SendText sends a customer-service-window text message using credentials that
+// were resolved server-side for the owning company. Tokens never reach the UI.
+func SendText(ctx context.Context, phoneNumberID, accessToken, apiVersion, to, text string) (string, error) {
+	if strings.TrimSpace(phoneNumberID) == "" || strings.TrimSpace(accessToken) == "" || strings.TrimSpace(to) == "" {
+		return "", errors.New("WhatsApp phone number, token and recipient are required")
+	}
+	if strings.TrimSpace(text) == "" || len(text) > 4096 {
+		return "", errors.New("WhatsApp text must contain 1 to 4096 characters")
+	}
+	if apiVersion == "" {
+		apiVersion = DefaultApiVersion
+	}
+	payload, err := json.Marshal(map[string]any{
+		"messaging_product": "whatsapp", "recipient_type": "individual", "to": strings.TrimPrefix(to, "+"),
+		"type": "text", "text": map[string]any{"preview_url": false, "body": text},
+	})
+	if err != nil {
+		return "", err
+	}
+	cfg := &Config{PhoneNumberId: phoneNumberID, AccessToken: accessToken, ApiVersion: apiVersion}
+	endpoint := fmt.Sprintf("%s/%s/%s/messages", graphBaseURL, cfg.ApiVersion, url.PathEscape(cfg.PhoneNumberId))
+	raw, err := doGraph(ctx, cfg, http.MethodPost, endpoint, payload)
+	if err != nil {
+		return "", err
+	}
+	var out struct {
+		Messages []struct {
+			Id string `json:"id"`
+		} `json:"messages"`
+	}
+	if err = json.Unmarshal(raw, &out); err != nil || len(out.Messages) == 0 {
+		return "", fmt.Errorf("unexpected whatsapp response: %s", snippet(raw))
+	}
+	return out.Messages[0].Id, nil
+}
+
 type graphError struct {
 	Error *struct {
 		Message string `json:"message"`

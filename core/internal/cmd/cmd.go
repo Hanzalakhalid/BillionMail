@@ -7,6 +7,7 @@ import (
 	"billionmail-core/internal/controller/askai"
 	"billionmail-core/internal/controller/batch_mail"
 	"billionmail-core/internal/controller/campaign"
+	chatbot_ctrl "billionmail-core/internal/controller/chatbot"
 	companies_ctrl "billionmail-core/internal/controller/companies"
 	"billionmail-core/internal/controller/contact"
 	delivery_log_ctrl "billionmail-core/internal/controller/delivery_log"
@@ -360,6 +361,7 @@ var (
 					identity_ctrl.NewV1(),
 					ad_intel_ctrl.NewV1(),
 					workflow_ctrl.NewV1(),
+					chatbot_ctrl.NewV1(),
 				)
 			})
 

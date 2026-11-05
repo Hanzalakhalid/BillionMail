@@ -3,7 +3,8 @@
 		<n-tabs v-model:value="activeTab" type="line" animated>
 			<n-tab-pane name="send" tab="Send">
 				<n-alert v-if="!config.enabled" type="warning" class="mb-16px">
-					WhatsApp sending is disabled. Add your WhatsApp Cloud API details in the Settings tab first.
+					WhatsApp sending is disabled. Add your WhatsApp Cloud API details in the Settings tab
+					first.
 				</n-alert>
 				<n-form label-placement="top" class="max-w-640px">
 					<n-form-item label="Send to">
@@ -19,7 +20,11 @@
 						v-else
 						label="Contact group"
 						feedback="Only subscribed contacts with a phone attribute are messaged.">
-						<n-select v-model:value="form.groupId" :options="groupOptions" placeholder="Select a group" filterable />
+						<n-select
+							v-model:value="form.groupId"
+							:options="groupOptions"
+							placeholder="Select a group"
+							filterable />
 					</n-form-item>
 
 					<n-form-item
@@ -34,7 +39,9 @@
 							@update:value="handleSelectTemplate" />
 					</n-form-item>
 					<template v-else>
-						<n-form-item label="Template name" feedback="Exact name of a template approved in WhatsApp Manager.">
+						<n-form-item
+							label="Template name"
+							feedback="Exact name of a template approved in WhatsApp Manager.">
 							<n-input v-model:value="form.template" placeholder="appointment_reminder" />
 						</n-form-item>
 						<n-form-item label="Template language">
@@ -44,14 +51,23 @@
 
 					<n-form-item :label="paramsLabel">
 						<div class="w-full">
-							<div v-for="(_, index) in form.params" :key="index" class="mb-8px flex items-center gap-8px">
+							<div
+								v-for="(_, index) in form.params"
+								:key="index"
+								class="mb-8px flex items-center gap-8px">
 								<span class="w-48px text-desc">{{ placeholderName(index) }}</span>
 								<n-input v-model:value="form.params[index]" :placeholder="paramPlaceholder" />
-								<n-button v-if="!selectedTemplate" text type="error" @click="form.params.splice(index, 1)">
+								<n-button
+									v-if="!selectedTemplate"
+									text
+									type="error"
+									@click="form.params.splice(index, 1)">
 									Remove
 								</n-button>
 							</div>
-							<n-button v-if="!selectedTemplate" size="small" @click="form.params.push('')">Add value</n-button>
+							<n-button v-if="!selectedTemplate" size="small" @click="form.params.push('')"
+								>Add value</n-button
+							>
 						</div>
 					</n-form-item>
 
@@ -95,20 +111,52 @@
 
 			<n-tab-pane name="settings" tab="Settings">
 				<n-alert type="info" class="mb-16px max-w-640px">
-					Uses the official WhatsApp Cloud API by Meta. Create an app at developers.facebook.com, add
-					WhatsApp, then copy the IDs and a permanent access token here.
+					Uses the official WhatsApp Cloud API by Meta. Create an app at developers.facebook.com,
+					add WhatsApp, then copy the IDs and a permanent access token here.
 				</n-alert>
+				<div class="max-w-760px mb-24px">
+					<div class="flex items-center justify-between mb-12px">
+						<div>
+							<b>Company WhatsApp channels</b>
+							<div class="text-desc text-12px">
+								These encrypted channels can be assigned to company chatbots.
+							</div>
+						</div>
+						<n-button type="primary" secondary @click="channelModal = true"
+							><i class="i-mdi-plus mr-4px" />Connect number</n-button
+						>
+					</div>
+					<n-empty v-if="!channels.length" description="No company channel connected" />
+					<n-card v-for="channel in channels" :key="channel.id" size="small" class="mb-8px">
+						<div class="flex items-center">
+							<div class="flex-1">
+								<b>{{ channel.verified_name || channel.business_name || 'WhatsApp Business' }}</b>
+								<div class="text-desc">
+									{{ channel.display_phone_number || channel.phone_number_id }}
+								</div>
+							</div>
+							<n-tag type="success">{{ channel.status }}</n-tag>
+						</div>
+					</n-card>
+				</div>
+				<n-divider>Legacy outbound campaign settings</n-divider>
 				<n-form label-placement="top" class="max-w-640px">
 					<n-form-item label="Enable WhatsApp sending">
 						<n-switch v-model:value="config.enabled" />
 					</n-form-item>
-					<n-form-item label="Phone number ID" feedback="WhatsApp Manager > API setup > Phone number ID">
-						<n-input v-model:value="config.phone_number_id" :input-props="{ autocomplete: 'off' }" />
+					<n-form-item
+						label="Phone number ID"
+						feedback="WhatsApp Manager > API setup > Phone number ID">
+						<n-input
+							v-model:value="config.phone_number_id"
+							:input-props="{ autocomplete: 'off' }" />
 					</n-form-item>
 					<n-form-item
 						label="WhatsApp Business Account ID (optional)"
 						feedback="Needed to list your approved templates on the Send tab.">
-						<n-input v-model:value="config.business_account_id" :input-props="{ autocomplete: 'off' }" />
+						<n-input
+							v-model:value="config.business_account_id"
+							:input-props="{ autocomplete: 'off' }" />
 					</n-form-item>
 					<n-form-item label="Access token">
 						<n-input
@@ -118,17 +166,64 @@
 							:input-props="{ autocomplete: 'new-password' }" />
 					</n-form-item>
 					<n-form-item label="Graph API version">
-						<n-input v-model:value="config.api_version" :input-props="{ autocomplete: 'off' }" placeholder="v23.0" />
+						<n-input
+							v-model:value="config.api_version"
+							:input-props="{ autocomplete: 'off' }"
+							placeholder="v23.0" />
 					</n-form-item>
 					<n-form-item
 						label="Default country code"
 						feedback="Local numbers like 0300... become 92300... with code 92.">
-						<n-input v-model:value="config.default_country_code" :input-props="{ autocomplete: 'off' }" />
+						<n-input
+							v-model:value="config.default_country_code"
+							:input-props="{ autocomplete: 'off' }" />
 					</n-form-item>
 					<n-button type="primary" @click="handleSaveConfig">Save</n-button>
 				</n-form>
 			</n-tab-pane>
 		</n-tabs>
+
+		<n-modal
+			v-model:show="channelModal"
+			preset="card"
+			title="Connect company WhatsApp number"
+			class="w-600px">
+			<n-alert type="warning" class="mb-12px"
+				>The access token is sent only to the backend and stored encrypted. Use a Meta system-user
+				token for production.</n-alert
+			>
+			<n-form label-placement="top">
+				<n-form-item label="WhatsApp Business Account ID"
+					><n-input v-model:value="channelForm.waba_id"
+				/></n-form-item>
+				<n-form-item label="Business name"
+					><n-input v-model:value="channelForm.business_name"
+				/></n-form-item>
+				<n-form-item label="Phone number ID"
+					><n-input v-model:value="channelForm.phone_number_id"
+				/></n-form-item>
+				<n-form-item label="Display phone number"
+					><n-input v-model:value="channelForm.display_phone_number" placeholder="+92 300 1234567"
+				/></n-form-item>
+				<n-form-item label="Verified name"
+					><n-input v-model:value="channelForm.verified_name"
+				/></n-form-item>
+				<n-form-item label="Access token"
+					><n-input
+						v-model:value="channelForm.access_token"
+						type="password"
+						show-password-on="click"
+				/></n-form-item>
+			</n-form>
+			<template #footer
+				><div class="flex justify-end gap-8px">
+					<n-button @click="channelModal = false">Cancel</n-button
+					><n-button type="primary" :disabled="!canConnectChannel" @click="handleConnectChannel"
+						>Connect securely</n-button
+					>
+				</div></template
+			>
+		</n-modal>
 	</div>
 </template>
 
@@ -145,12 +240,49 @@ import {
 	sendWhatsappTest,
 	sendWhatsappGroup,
 	getWhatsappLogs,
+	getWhatsappChannels,
+	connectWhatsappChannel,
 	type WhatsappConfig,
 	type WhatsappTemplate,
 	type WhatsappLog,
+	type WhatsappChannel,
 } from '@/api/modules/whatsapp'
 
 const activeTab = ref('send')
+
+const channels = ref<WhatsappChannel[]>([])
+const channelModal = ref(false)
+const channelForm = ref({
+	waba_id: '',
+	business_name: '',
+	phone_number_id: '',
+	display_phone_number: '',
+	verified_name: '',
+	access_token: '',
+})
+const loadChannels = async () => {
+	const res = await getWhatsappChannels()
+	channels.value = isArray<WhatsappChannel>(res) ? res : []
+}
+const canConnectChannel = computed(
+	() =>
+		!!channelForm.value.waba_id.trim() &&
+		!!channelForm.value.phone_number_id.trim() &&
+		!!channelForm.value.access_token.trim()
+)
+const handleConnectChannel = async () => {
+	await connectWhatsappChannel(channelForm.value)
+	channelModal.value = false
+	channelForm.value = {
+		waba_id: '',
+		business_name: '',
+		phone_number_id: '',
+		display_phone_number: '',
+		verified_name: '',
+		access_token: '',
+	}
+	loadChannels()
+}
 
 // Settings
 const config = ref<WhatsappConfig>({
@@ -195,7 +327,9 @@ const templateOptions = computed<SelectOption[]>(() =>
 )
 
 const selectedTemplateKey = computed(() =>
-	form.value.template ? templateKey({ name: form.value.template, language: form.value.language }) : null
+	form.value.template
+		? templateKey({ name: form.value.template, language: form.value.language })
+		: null
 )
 
 const selectedTemplate = computed(() =>
@@ -306,6 +440,7 @@ const columns: DataTableColumns<WhatsappLog> = [
 
 onMounted(async () => {
 	loadGroups()
+	loadChannels()
 	await loadConfig()
 	loadTemplates()
 })

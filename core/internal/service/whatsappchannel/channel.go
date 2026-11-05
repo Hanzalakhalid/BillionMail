@@ -47,6 +47,35 @@ type Connection struct {
 	PhoneNumberIDs []uuid.UUID
 }
 
+type Channel struct {
+	ID                 uuid.UUID `json:"id"`
+	AccountID          uuid.UUID `json:"account_id"`
+	WABAID             string    `json:"waba_id"`
+	BusinessName       string    `json:"business_name"`
+	PhoneNumberID      string    `json:"phone_number_id"`
+	DisplayPhoneNumber string    `json:"display_phone_number"`
+	VerifiedName       string    `json:"verified_name"`
+	Status             string    `json:"status"`
+}
+
+func List(ctx context.Context, tenant tenancy.TenantContext) ([]Channel, error) {
+	if err := tenancy.Authorize(tenant, "channel.read"); err != nil {
+		return nil, err
+	}
+	var channels []Channel
+	err := g.DB().Transaction(ctx, func(_ context.Context, tx gdb.TX) error {
+		if _, err := tx.Exec("SELECT set_config('app.company_id', ?, true)", tenant.CompanyID.String()); err != nil {
+			return err
+		}
+		return tx.Model("whatsapp_phone_numbers p").
+			InnerJoin("whatsapp_accounts a", "a.id=p.whatsapp_account_id AND a.company_id=p.company_id").
+			Fields("p.id,p.whatsapp_account_id account_id,a.waba_id,a.business_name,p.phone_number_id,p.display_phone_number,p.verified_name,p.status").
+			Where("p.company_id", tenant.CompanyID).WhereNull("p.deleted_at").WhereNull("a.deleted_at").
+			OrderDesc("p.created_at").Scan(&channels)
+	})
+	return channels, err
+}
+
 // Connect persists discovered Meta assets and a new encrypted credential version atomically.
 // A global provider identity can never be reassigned through this use case.
 func Connect(ctx context.Context, tenant tenancy.TenantContext, store SecretStore, input ConnectInput) (Connection, error) {

@@ -1,11 +1,14 @@
 package main
 
 import (
+	"billionmail-core/internal/service/chatbot"
 	"billionmail-core/internal/service/database_initialization"
 	"billionmail-core/internal/service/notifications"
 	"billionmail-core/internal/service/public"
 	platformqueue "billionmail-core/internal/service/queue"
 	"billionmail-core/internal/service/rbac"
+	"billionmail-core/internal/service/secrets"
+	"billionmail-core/internal/service/whatsappdelivery"
 	"context"
 	"fmt"
 	"os"
@@ -45,15 +48,22 @@ func main() {
 		}
 	}
 	emailHandler := notifications.IdentityEmailHandler{Mailer: mailer, TokenSecret: rbac.JWT().Secret}
-	processor := platformqueue.Processor{Consumer: "notification-worker", Handlers: map[string]platformqueue.Handler{
+	secretStore, err := secrets.NewConfiguredStore(ctx)
+	if err != nil {
+		panic(err)
+	}
+	deliveryHandler := whatsappdelivery.Handler{Store: secretStore, APIVersion: public.MustGetDockerEnv("META_GRAPH_API_VERSION", "v23.0")}
+	processor := platformqueue.Processor{Consumer: "saas-worker", Handlers: map[string]platformqueue.Handler{
 		"identity.email_verification.requested": emailHandler.Handle,
 		"identity.password_reset.requested":     emailHandler.Handle,
 		"company.invitation.created":            emailHandler.Handle,
+		"whatsapp.webhook.received":             chatbot.HandleWebhook,
+		"whatsapp.message.send":                 deliveryHandler.Handle,
 	}}
 
 	server := asynq.NewServer(redisOpt, asynq.Config{
 		Concurrency:     10,
-		Queues:          map[string]int{"notifications": 8, "default": 2},
+		Queues:          map[string]int{"webhooks": 8, "delivery": 8, "notifications": 4, "default": 2},
 		ShutdownTimeout: 30 * time.Second,
 	})
 	mux := asynq.NewServeMux()
