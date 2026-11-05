@@ -127,7 +127,7 @@ func processInbound(tx gdb.TX, companyID, phoneID uuid.UUID, providerMessageID, 
 	}
 	rawJSON, _ := json.Marshal(raw)
 	result, err := tx.Exec(`INSERT INTO whatsapp_messages(id,company_id,conversation_id,provider_message_id,direction,message_type,body,payload,status,created_at)
-        VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(company_id,provider_message_id) DO NOTHING`,
+        VALUES(?,?,?,?,?,?,?,?,?,?) ON CONFLICT(company_id,provider_message_id) WHERE provider_message_id IS NOT NULL DO NOTHING`,
 		uuid.New(), companyID, conversationID, providerMessageID, "inbound", messageType, input, rawJSON, "received", now)
 	if err != nil {
 		return err

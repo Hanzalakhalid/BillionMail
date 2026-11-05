@@ -3,6 +3,7 @@ package whatsappchannel
 import (
 	"context"
 	"database/sql"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"strings"
@@ -145,8 +146,9 @@ func Connect(ctx context.Context, tenant tenancy.TenantContext, store SecretStor
 		}
 		if _, txErr = tx.Model("whatsapp_credentials").Data(g.Map{
 			"id": uuid.New(), "company_id": tenant.CompanyID, "whatsapp_account_id": account.ID,
-			"credential_type": "access_token", "ciphertext": envelope.Ciphertext,
-			"encrypted_data_key": envelope.EncryptedDataKey, "key_arn": envelope.KeyARN,
+			// Binary values go in as hex so the driver cannot mangle them as text.
+			"credential_type": "access_token", "ciphertext": gdb.Raw("decode('" + hex.EncodeToString(envelope.Ciphertext) + "','hex')"),
+			"encrypted_data_key": gdb.Raw("decode('" + hex.EncodeToString(envelope.EncryptedDataKey) + "','hex')"), "key_arn": envelope.KeyARN,
 			"credential_version": version, "expires_at": input.TokenExpiresAt,
 		}).Insert(); txErr != nil {
 			return txErr
@@ -200,21 +202,31 @@ func AccessToken(ctx context.Context, companyID, accountID uuid.UUID, store Secr
 		if _, txErr := tx.Exec("SELECT set_config('app.company_id', ?, true)", companyID.String()); txErr != nil {
 			return txErr
 		}
+		// bytea is read as hex text so the driver never reinterprets the binary.
 		var credential struct {
-			Ciphertext       []byte `json:"ciphertext"`
-			EncryptedDataKey []byte `json:"encrypted_data_key"`
+			Ciphertext       string `json:"ciphertext"`
+			EncryptedDataKey string `json:"encrypted_data_key"`
 			KeyARN           string `json:"key_arn"`
 		}
 		if txErr := tx.Model("whatsapp_credentials").
+			Fields("encode(ciphertext,'hex') AS ciphertext, encode(encrypted_data_key,'hex') AS encrypted_data_key, key_arn").
 			Where("company_id", companyID).Where("whatsapp_account_id", accountID).
 			Where("credential_type", "access_token").WhereNull("revoked_at").
 			OrderDesc("credential_version").Limit(1).Scan(&credential); txErr != nil {
 			return txErr
 		}
-		if len(credential.Ciphertext) == 0 {
+		if credential.Ciphertext == "" {
 			return errors.New("active WhatsApp credential not found")
 		}
-		envelope = secrets.Envelope{Ciphertext: credential.Ciphertext, EncryptedDataKey: credential.EncryptedDataKey, KeyARN: credential.KeyARN}
+		ciphertext, decodeErr := hex.DecodeString(credential.Ciphertext)
+		if decodeErr != nil {
+			return fmt.Errorf("decode WhatsApp credential: %w", decodeErr)
+		}
+		dataKey, decodeErr := hex.DecodeString(credential.EncryptedDataKey)
+		if decodeErr != nil {
+			return fmt.Errorf("decode WhatsApp credential key: %w", decodeErr)
+		}
+		envelope = secrets.Envelope{Ciphertext: ciphertext, EncryptedDataKey: dataKey, KeyARN: credential.KeyARN}
 		return nil
 	})
 	if err != nil {

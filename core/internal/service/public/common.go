@@ -2425,7 +2425,8 @@ func DockerEnv(envName string) (envVal string, err error) {
 func MustGetDockerEnv(envName string, def string) (envVal string) {
 	var err error
 	envVal, err = DockerEnv(envName)
-	if err != nil {
+	if err != nil || envVal == "" {
+		// A key that is missing from .env (or set to nothing) uses the default.
 		envVal = def
 	}
 	return

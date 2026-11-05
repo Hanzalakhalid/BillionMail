@@ -216,6 +216,7 @@ var (
 				"/favicon.ico":                   {},
 				"/health/live":                   {},
 				"/health/ready":                  {},
+				"/webhooks/meta/whatsapp":        {}, // Meta never passes the safe path
 				"/api/v1/auth/register":          {},
 				"/api/v1/auth/verify-email":      {},
 				"/api/v1/auth/forgot-password":   {},

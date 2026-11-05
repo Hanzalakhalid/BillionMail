@@ -16,7 +16,7 @@ type ListRes struct {
 
 type DetailReq struct {
 	g.Meta `path:"/v1/chatbots/{id}" method:"get" tags:"WhatsApp Chatbots"`
-	ID     string `json:"id" in:"path" v:"required|uuid"`
+	ID     string `json:"id" in:"path" v:"required|regex:^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"`
 }
 type DetailRes struct {
 	api_v1.StandardRes
@@ -26,7 +26,7 @@ type DetailRes struct {
 type CreateReq struct {
 	g.Meta        `path:"/v1/chatbots" method:"post" tags:"WhatsApp Chatbots"`
 	Name          string        `json:"name" v:"required|max-length:160"`
-	PhoneNumberID string        `json:"phone_number_id" v:"required|uuid"`
+	PhoneNumberID string        `json:"phone_number_id" v:"required|regex:^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"`
 	Graph         chatbot.Graph `json:"graph" v:"required"`
 }
 type CreateRes struct {
@@ -38,22 +38,22 @@ type CreateRes struct {
 
 type UpdateReq struct {
 	g.Meta        `path:"/v1/chatbots/{id}" method:"put" tags:"WhatsApp Chatbots"`
-	ID            string        `json:"id" in:"path" v:"required|uuid"`
+	ID            string        `json:"id" in:"path" v:"required|regex:^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"`
 	Name          string        `json:"name" v:"required|max-length:160"`
-	PhoneNumberID string        `json:"phone_number_id" v:"required|uuid"`
+	PhoneNumberID string        `json:"phone_number_id" v:"required|regex:^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"`
 	Graph         chatbot.Graph `json:"graph" v:"required"`
 }
 type UpdateRes struct{ api_v1.StandardRes }
 
 type PublishReq struct {
 	g.Meta `path:"/v1/chatbots/{id}/publish" method:"post" tags:"WhatsApp Chatbots"`
-	ID     string `json:"id" in:"path" v:"required|uuid"`
+	ID     string `json:"id" in:"path" v:"required|regex:^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"`
 }
 type PublishRes struct{ api_v1.StandardRes }
 
 type DeleteReq struct {
 	g.Meta `path:"/v1/chatbots/{id}" method:"delete" tags:"WhatsApp Chatbots"`
-	ID     string `json:"id" in:"path" v:"required|uuid"`
+	ID     string `json:"id" in:"path" v:"required|regex:^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"`
 }
 type DeleteRes struct{ api_v1.StandardRes }
 

@@ -32,7 +32,7 @@ type CreateRes struct {
 type SwitchReq struct {
 	g.Meta        `path:"/v1/companies/switch" method:"post" tags:"Companies" summary:"Switch active company"`
 	Authorization string `json:"authorization" in:"header"`
-	CompanyID     string `json:"company_id" v:"required|uuid"`
+	CompanyID     string `json:"company_id" v:"required|regex:^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"`
 }
 type SwitchRes struct {
 	api_v1.StandardRes
@@ -87,19 +87,19 @@ type AcceptInvitationRes struct {
 
 type ChangeRoleReq struct {
 	g.Meta       `path:"/v1/companies/members/change_role" method:"post" tags:"Companies" summary:"Change member role"`
-	MembershipID string `json:"membership_id" v:"required|uuid"`
+	MembershipID string `json:"membership_id" v:"required|regex:^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"`
 	Role         string `json:"role" v:"required|in:admin,manager,agent,viewer"`
 }
 type ChangeRoleRes struct{ api_v1.StandardRes }
 
 type RemoveMemberReq struct {
 	g.Meta       `path:"/v1/companies/members/remove" method:"post" tags:"Companies" summary:"Remove company member"`
-	MembershipID string `json:"membership_id" v:"required|uuid"`
+	MembershipID string `json:"membership_id" v:"required|regex:^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"`
 }
 type RemoveMemberRes struct{ api_v1.StandardRes }
 
 type RevokeInvitationReq struct {
 	g.Meta       `path:"/v1/companies/invitations/revoke" method:"post" tags:"Companies" summary:"Revoke company invitation"`
-	InvitationID string `json:"invitation_id" v:"required|uuid"`
+	InvitationID string `json:"invitation_id" v:"required|regex:^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"`
 }
 type RevokeInvitationRes struct{ api_v1.StandardRes }
