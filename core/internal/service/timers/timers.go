@@ -15,6 +15,7 @@ import (
 	"billionmail-core/internal/service/relay"
 	"billionmail-core/internal/service/video_gen"
 	"billionmail-core/internal/service/warmup"
+	"billionmail-core/internal/service/workflow"
 	"context"
 	"time"
 
@@ -192,6 +193,11 @@ func Start(ctx context.Context) (err error) {
 	// Video generation pipeline orchestrator
 	gtimer.Add(30*time.Second, func() {
 		video_gen.ProcessVideoJobs(ctx)
+	})
+
+	// Automation workflows: enroll new contacts and run due steps
+	gtimer.Add(30*time.Second, func() {
+		workflow.Tick(ctx)
 	})
 
 	// Check the domain name blacklist

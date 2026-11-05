@@ -116,8 +116,9 @@
 			"adFinder": "Ad Finder",
 			"sms": "SMS",
 			"push": "Push",
-			"whatsapp": "WhatsApp"
-			,"team": "Team Members"
+			"whatsapp": "WhatsApp",
+			"team": "Team Members",
+			"workflows": "Workflows"
 		}
 	},
 	"login": {

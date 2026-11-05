@@ -107,7 +107,8 @@
 			"adFinder": "Ad Finder",
 			"sms": "SMS",
 			"push": "Push",
-			"whatsapp": "WhatsApp"
+			"whatsapp": "WhatsApp",
+			"workflows": "ワークフロー"
 		}
 	},
 	"login": {

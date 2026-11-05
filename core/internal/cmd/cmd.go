@@ -32,6 +32,7 @@ import (
 	"billionmail-core/internal/controller/tags"
 	video_outreach_ctrl "billionmail-core/internal/controller/video_outreach"
 	whatsapp_ctrl "billionmail-core/internal/controller/whatsapp"
+	workflow_ctrl "billionmail-core/internal/controller/workflow"
 	"billionmail-core/internal/service/database_initialization"
 	docker "billionmail-core/internal/service/dockerapi"
 	"billionmail-core/internal/service/maillog_stat"
@@ -358,6 +359,7 @@ var (
 					companies_ctrl.NewV1(),
 					identity_ctrl.NewV1(),
 					ad_intel_ctrl.NewV1(),
+					workflow_ctrl.NewV1(),
 				)
 			})
 

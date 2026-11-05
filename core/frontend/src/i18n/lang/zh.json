@@ -116,7 +116,8 @@
 			"adFinder": "广告发现",
 			"sms": "短信",
 			"push": "推送通知",
-			"whatsapp": "WhatsApp"
+			"whatsapp": "WhatsApp",
+			"workflows": "自动化流程"
 		}
 	},
 	"login": {
