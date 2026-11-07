@@ -17,6 +17,7 @@ import (
 	"billionmail-core/internal/controller/files"
 	health_ctrl "billionmail-core/internal/controller/health"
 	identity_ctrl "billionmail-core/internal/controller/identity"
+	integrations_ctrl "billionmail-core/internal/controller/integrations"
 	"billionmail-core/internal/controller/languages"
 	"billionmail-core/internal/controller/mail_boxes"
 	"billionmail-core/internal/controller/mail_services"
@@ -360,6 +361,7 @@ var (
 					delivery_log_ctrl.NewV1(),
 					companies_ctrl.NewV1(),
 					identity_ctrl.NewV1(),
+					integrations_ctrl.NewV1(),
 					ad_intel_ctrl.NewV1(),
 					workflow_ctrl.NewV1(),
 					chatbot_ctrl.NewV1(),

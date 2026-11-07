@@ -49,6 +49,15 @@ func NewConfiguredStore(ctx context.Context) (EnvelopeStore, error) {
 	return &localStore{masterKey: key}, nil
 }
 
+// NewPersistentStore rejects the shared development fallback. BYOK credentials
+// must remain decryptable only with an explicitly configured deployment key.
+func NewPersistentStore(ctx context.Context) (EnvelopeStore, error) {
+	if strings.TrimSpace(os.Getenv("SAAS_KMS_KEY_ARN")) == "" && strings.TrimSpace(os.Getenv("SAAS_LOCAL_MASTER_KEY")) == "" {
+		return nil, errors.New("SAAS_LOCAL_MASTER_KEY or SAAS_KMS_KEY_ARN is required for provider credentials")
+	}
+	return NewConfiguredStore(ctx)
+}
+
 type localStore struct{ masterKey []byte }
 
 func (s *localStore) Encrypt(_ context.Context, companyID uuid.UUID, plaintext []byte) (Envelope, error) {

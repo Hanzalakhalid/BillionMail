@@ -23,6 +23,7 @@ const routesReflectList = [
 	'WhatsApp',
 	'Push',
 	'Team Members',
+	'Integrations',
 ]
 
 // Import routes from modules
