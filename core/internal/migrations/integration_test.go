@@ -2,16 +2,20 @@ package migrations
 
 import (
 	"billionmail-core/internal/service/identity"
+	"billionmail-core/internal/service/integrations"
 	platformqueue "billionmail-core/internal/service/queue"
+	"billionmail-core/internal/service/scheduler"
 	"billionmail-core/internal/service/secrets"
 	"billionmail-core/internal/service/tenancy"
 	"billionmail-core/internal/service/whatsappchannel"
 	"billionmail-core/internal/service/whatsappwebhook"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -19,6 +23,7 @@ import (
 	"github.com/gogf/gf/v2/database/gdb"
 	"github.com/gogf/gf/v2/frame/g"
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 )
 
 type recordingPublisher struct{ events []platformqueue.Event }
@@ -81,6 +86,18 @@ func TestFoundationMigrationAndTenantRLS(t *testing.T) {
 	}
 	if err = Up(ctx); err != nil {
 		t.Fatalf("idempotent Up: %v", err)
+	}
+	if ready, err := Ready(ctx); err != nil || !ready {
+		t.Fatalf("applied schema is not ready: %v", err)
+	}
+	if _, err := g.DB().Model("goose_db_version").Where("version_id", 8).Data(g.Map{"is_applied": false}).Update(); err != nil {
+		t.Fatal(err)
+	}
+	if ready, err := Ready(ctx); err != nil || ready {
+		t.Fatalf("incomplete schema reported ready: %v", err)
+	}
+	if _, err := g.DB().Model("goose_db_version").Where("version_id", 8).Data(g.Map{"is_applied": true}).Update(); err != nil {
+		t.Fatal(err)
 	}
 
 	companyValue, err := g.DB().Model("companies").Where("is_legacy_default", true).Value("id")
@@ -282,6 +299,279 @@ func TestFoundationMigrationAndTenantRLS(t *testing.T) {
 		pending, _ := g.DB().Model("outbox_events").WhereNull("published_at").WhereNull("dead_lettered_at").Count()
 		if pending != 0 {
 			t.Fatalf("outbox left %d due events unpublished", pending)
+		}
+	})
+
+	t.Run("integration credentials and tenant isolation", func(t *testing.T) {
+		company, _ := uuid.Parse(companyID)
+		userValue, err := g.DB().Model("users").Where("username", "legacy-admin").Value("id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		user, _ := uuid.Parse(userValue.String())
+		for i := 0; i < 12; i++ {
+			_, token, err := tenancy.CreateSession(ctx, user, company, "integration-test", "127.0.0.1", time.Hour)
+			if err != nil {
+				t.Fatal(err)
+			}
+			next, _, err := tenancy.RotateSession(ctx, token, time.Hour)
+			if err != nil {
+				t.Fatalf("binary refresh hash roundtrip: %v", err)
+			}
+			if _, _, err = tenancy.RotateSession(ctx, token, time.Hour); !errors.Is(err, tenancy.ErrInvalidRefreshToken) {
+				t.Fatalf("refresh reuse err=%v", err)
+			}
+			active, err := g.DB().Model("auth_sessions").Where("token_family", next.TokenFamily).WhereNull("revoked_at").Count()
+			if err != nil || active != 0 {
+				t.Fatalf("reuse revocation did not commit: active=%d err=%v", active, err)
+			}
+		}
+		tenant := tenancy.TenantContext{CompanyID: company, UserID: user, Role: "owner"}
+		store := integrationSecretStore{}
+		id, err := integrations.Create(ctx, tenant, store, integrations.Input{Provider: "test-provider", Capability: "image", Name: "primary", Secret: "private-test-credential"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		connections, err := integrations.List(ctx, tenant)
+		if err != nil || len(connections) != 1 || connections[0].Status != "unverified" {
+			t.Fatalf("list=%+v err=%v", connections, err)
+		}
+		other := tenancy.TenantContext{CompanyID: otherCompany, UserID: user, Role: "owner"}
+		connections, err = integrations.List(ctx, other)
+		if err != nil || len(connections) != 0 {
+			t.Fatalf("cross-tenant list=%+v err=%v", connections, err)
+		}
+		if _, err = integrations.Credential(ctx, otherCompany, id, store); err == nil {
+			t.Fatal("cross-tenant credential readable")
+		}
+		if err = integrations.Rotate(ctx, other, store, id, "stolen"); err == nil {
+			t.Fatal("cross-tenant credential rotation allowed")
+		}
+		if err = integrations.Rotate(ctx, tenant, store, id, "rotated-test-credential"); err != nil {
+			t.Fatal(err)
+		}
+		credential, err := integrations.Credential(ctx, company, id, store)
+		if err != nil || string(credential) != "rotated-test-credential" {
+			t.Fatalf("active credential lookup err=%v", err)
+		}
+		if err = integrations.Disconnect(ctx, tenant, id); err != nil {
+			t.Fatal(err)
+		}
+		if _, err = integrations.Credential(ctx, company, id, store); err == nil {
+			t.Fatal("disconnected credential readable")
+		}
+		if _, err = integrations.Create(ctx, tenancy.TenantContext{CompanyID: company, UserID: user, Role: "viewer"}, store, integrations.Input{}); !errors.Is(err, tenancy.ErrPermissionDenied) {
+			t.Fatalf("viewer create err=%v", err)
+		}
+	})
+
+	t.Run("durable scheduler", func(t *testing.T) {
+		company, _ := uuid.Parse(companyID)
+		eventType := "platform.schedule.probe"
+		makeSchedule := func(fields g.Map) uuid.UUID {
+			t.Helper()
+			id := uuid.New()
+			data := g.Map{"id": id, "company_id": company, "name": "probe", "event_type": eventType, "next_run_at": time.Now().Add(-time.Minute)}
+			for key, value := range fields {
+				data[key] = value
+			}
+			if _, err := g.DB().Model("marketing_schedules").Data(data).Insert(); err != nil {
+				t.Fatal(err)
+			}
+			return id
+		}
+		for i := 0; i < 12; i++ {
+			makeSchedule(nil)
+		}
+		var wg sync.WaitGroup
+		errorsCh := make(chan error, 2)
+		for _, worker := range []string{"scheduler-a", "scheduler-b"} {
+			wg.Add(1)
+			go func(worker string) {
+				defer wg.Done()
+				_, err := (scheduler.Scheduler{WorkerID: worker, AllowedEvents: map[string]bool{eventType: true}}).Tick(ctx)
+				errorsCh <- err
+			}(worker)
+		}
+		wg.Wait()
+		close(errorsCh)
+		for err := range errorsCh {
+			if err != nil {
+				t.Fatal(err)
+			}
+		}
+		runs, err := g.DB().Model("marketing_job_runs").Where("company_id", company).Count()
+		if err != nil || runs != 12 {
+			t.Fatalf("concurrent claim runs=%d err=%v, want 12", runs, err)
+		}
+		runner := scheduler.Scheduler{WorkerID: "recovery-worker", AllowedEvents: map[string]bool{eventType: true}}
+		if count, err := runner.Tick(ctx); err != nil || count != 0 {
+			t.Fatalf("duplicate tick count=%d err=%v", count, err)
+		}
+		leasedID := makeSchedule(g.Map{"leased_by": "terminated-worker", "leased_until": time.Now().Add(time.Hour)})
+		if count, err := runner.Tick(ctx); err != nil || count != 0 {
+			t.Fatalf("stole live lease count=%d err=%v", count, err)
+		}
+		if _, err := g.DB().Model("marketing_schedules").Where("id", leasedID).Data(g.Map{"leased_until": time.Now().Add(-time.Second)}).Update(); err != nil {
+			t.Fatal(err)
+		}
+		if count, err := runner.Tick(ctx); err != nil || count != 1 {
+			t.Fatalf("expired lease recovery count=%d err=%v", count, err)
+		}
+		pausedID := makeSchedule(g.Map{"status": "paused"})
+		unknownID := makeSchedule(g.Map{"event_type": "unregistered.external.send"})
+		if count, err := runner.Tick(ctx); err != nil || count != 0 {
+			t.Fatalf("unsafe schedules count=%d err=%v", count, err)
+		}
+		for id, want := range map[uuid.UUID]string{pausedID: "paused", unknownID: "failed"} {
+			status, err := g.DB().Model("marketing_schedules").Where("id", id).Value("status")
+			if err != nil || status.String() != want {
+				t.Fatalf("schedule status=%v err=%v want %s", status, err, want)
+			}
+		}
+		// A failure after the outbox insert must roll back both records. The
+		// durable lease is then recovered after the crashed owner expires.
+		atomicID := makeSchedule(nil)
+		if _, err := g.DB().Exec(ctx, `CREATE FUNCTION fail_test_job_insert() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected failure'; END $$; CREATE TRIGGER fail_test_job_insert BEFORE INSERT ON marketing_job_runs FOR EACH ROW EXECUTE FUNCTION fail_test_job_insert()`); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := runner.Tick(ctx); err == nil {
+			t.Fatal("injected transaction failure did not propagate")
+		}
+		if _, err := g.DB().Exec(ctx, `DROP TRIGGER fail_test_job_insert ON marketing_job_runs; DROP FUNCTION fail_test_job_insert()`); err != nil {
+			t.Fatal(err)
+		}
+		outboxCount, err := g.DB().Model("outbox_events").Where("aggregate_id", atomicID.String()).Count()
+		if err != nil || outboxCount != 0 {
+			t.Fatalf("failed transaction leaked outbox=%d err=%v", outboxCount, err)
+		}
+		if _, err := g.DB().Model("marketing_schedules").Where("id", atomicID).Data(g.Map{"leased_until": time.Now().Add(-time.Second)}).Update(); err != nil {
+			t.Fatal(err)
+		}
+		if count, err := runner.Tick(ctx); err != nil || count != 1 {
+			t.Fatalf("rolled back occurrence recovery count=%d err=%v", count, err)
+		}
+	})
+	t.Run("business profile", func(t *testing.T) {
+		company, _ := uuid.Parse(companyID)
+		userValue, err := g.DB().Model("users").Where("username", "legacy-admin").Value("id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		user, _ := uuid.Parse(userValue.String())
+		testBusinessProfile(t, ctx, tenancy.TenantContext{CompanyID: company, UserID: user, Role: "owner"}, tenancy.TenantContext{CompanyID: otherCompany, UserID: user, Role: "owner"})
+	})
+	t.Run("product catalog", func(t *testing.T) {
+		company, _ := uuid.Parse(companyID)
+		userValue, err := g.DB().Model("users").Where("username", "legacy-admin").Value("id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		user, _ := uuid.Parse(userValue.String())
+		testProducts(t, ctx, tenancy.TenantContext{CompanyID: company, UserID: user, Role: "owner"}, tenancy.TenantContext{CompanyID: otherCompany, UserID: user, Role: "owner"})
+	})
+	t.Run("persistent project workspace", func(t *testing.T) {
+		company, _ := uuid.Parse(companyID)
+		userValue, err := g.DB().Model("users").Where("username", "legacy-admin").Value("id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		user, _ := uuid.Parse(userValue.String())
+		testProjectWorkspace(t, ctx, tenancy.TenantContext{CompanyID: company, UserID: user, Role: "owner"}, tenancy.TenantContext{CompanyID: otherCompany, UserID: user, Role: "owner"})
+	})
+	t.Run("asset upload validation", func(t *testing.T) {
+		company, _ := uuid.Parse(companyID)
+		actorValue, err := g.DB().Model("users").Where("username", "legacy-admin").Value("id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		actor, _ := uuid.Parse(actorValue.String())
+		testAssetLifecycle(t, ctx, company, otherCompany, actor)
+		t.Run("HTTP storage handoff", func(t *testing.T) {
+			testAssetHTTPContract(t, ctx, tenancy.TenantContext{CompanyID: company, UserID: actor, Role: "owner"})
+		})
+	})
+	t.Run("dead letter replay with Redis", func(t *testing.T) {
+		redisAddr := os.Getenv("BM_TEST_REDIS_ADDR")
+		if redisAddr == "" {
+			t.Skip("BM_TEST_REDIS_ADDR is not configured")
+		}
+		var event platformqueue.Event
+		if err := g.DB().Model("outbox_events").Where("event_type", "platform.schedule.probe").Limit(1).Scan(&event); err != nil {
+			t.Fatal(err)
+		}
+		client := asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr})
+		defer client.Close()
+		inspector := asynq.NewInspector(asynq.RedisClientOpt{Addr: redisAddr})
+		defer inspector.Close()
+		publisher := platformqueue.AsynqPublisher{Client: client}
+		if err := publisher.Publish(ctx, event); err != nil {
+			t.Fatal(err)
+		}
+		if err := publisher.Publish(ctx, event); err != nil {
+			t.Fatalf("duplicate enqueue: %v", err)
+		}
+		if err := inspector.ArchiveTask("default", event.ID.String()); err != nil {
+			t.Fatal(err)
+		}
+		payload, _ := json.Marshal(event)
+		if err := platformqueue.RecordTaskFailure(ctx, asynq.NewTask(platformqueue.OutboxTaskType, payload), asynq.SkipRetry); err != nil {
+			t.Fatal(err)
+		}
+		actorValue, err := g.DB().Model("users").Where("username", "legacy-admin").Value("id")
+		if err != nil {
+			t.Fatal(err)
+		}
+		actor, _ := uuid.Parse(actorValue.String())
+		tenant := tenancy.TenantContext{CompanyID: event.CompanyID, UserID: actor, Role: "owner"}
+		if err := platformqueue.Replay(ctx, tenancy.TenantContext{CompanyID: otherCompany, UserID: actor, Role: "owner"}, event.ID); err == nil {
+			t.Fatal("cross-tenant replay allowed")
+		}
+		if err := platformqueue.Replay(ctx, tenant, event.ID); err != nil {
+			t.Fatal(err)
+		}
+		if err := platformqueue.Replay(ctx, tenant, event.ID); err == nil {
+			t.Fatal("duplicate replay accepted")
+		}
+		calls := 0
+		processor := platformqueue.Processor{Consumer: "replay-test", Handlers: map[string]platformqueue.Handler{"platform.schedule.probe": func(_ context.Context, command platformqueue.Event) error {
+			calls++
+			if string(command.Payload) != "{}" {
+				return fmt.Errorf("worker trusted Redis command content")
+			}
+			return nil
+		}}}
+		if err := processor.HandleTask(ctx, asynq.NewTask(platformqueue.OutboxTaskType, payload)); err != nil {
+			t.Fatal(err)
+		}
+		if calls != 0 {
+			t.Fatal("stale archived generation executed")
+		}
+		if err := g.DB().Model("outbox_events").Where("id", event.ID).Scan(&event); err != nil {
+			t.Fatal(err)
+		}
+		if event.DispatchGeneration != 1 {
+			t.Fatalf("replay generation=%d", event.DispatchGeneration)
+		}
+		if err := publisher.Publish(ctx, event); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := inspector.GetTaskInfo("default", event.ID.String()+":1"); err != nil {
+			t.Fatalf("new generation collided with archive: %v", err)
+		}
+		event.Payload = json.RawMessage(`{"tampered":true}`)
+		payload, _ = json.Marshal(event)
+		for i := 0; i < 2; i++ {
+			if err := processor.HandleTask(ctx, asynq.NewTask(platformqueue.OutboxTaskType, payload)); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if calls != 1 {
+			t.Fatalf("completed event executed %d times", calls)
+		}
+		status, err := g.DB().Model("marketing_job_runs").Where("outbox_event_id", event.ID).Value("status")
+		if err != nil || status.String() != "succeeded" {
+			t.Fatalf("job status=%v err=%v", status, err)
 		}
 	})
 }

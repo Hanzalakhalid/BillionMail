@@ -24,6 +24,10 @@ const routesReflectList = [
 	'Push',
 	'Team Members',
 	'Integrations',
+	'Asset Library',
+	'Business Profile',
+	'Products',
+	'Marketing Projects',
 ]
 
 // Import routes from modules

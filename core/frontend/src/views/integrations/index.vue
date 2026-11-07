@@ -5,7 +5,7 @@
     <h1 class="text-xl font-semibold">Integrations</h1>
     <p class="text-sm text-gray-500">Connect providers for future marketing projects. A saved key remains unverified until a provider test succeeds.</p>
    </div>
-   <n-button type="primary" @click="showCreate = true">Add integration</n-button>
+   <n-button v-if="canManage" type="primary" @click="showCreate = true">Add integration</n-button>
   </div>
   <n-alert v-if="error" type="error" class="mb-4">{{ error }}</n-alert>
   <n-spin :show="loading">
@@ -19,8 +19,8 @@
      </div>
      <div class="flex items-center gap-3">
       <n-tag :type="connection.status === 'connected' ? 'success' : 'warning'">{{ connection.status }}</n-tag>
-      <n-button size="small" @click="openRotate(connection)">Rotate key</n-button>
-      <n-popconfirm @positive-click="disconnect(connection.id)">
+      <n-button v-if="canManage" size="small" @click="openRotate(connection)">Rotate key</n-button>
+      <n-popconfirm v-if="canManage" @positive-click="disconnect(connection.id)">
        <template #trigger><n-button size="small" type="error" ghost>Disconnect</n-button></template>
        Disconnect this integration and revoke its credential?
       </n-popconfirm>
@@ -49,6 +49,10 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { createIntegration, disconnectIntegration, listIntegrations, rotateIntegration, type IntegrationConnection } from '@/api/modules/integrations'
+import { useCompanyStore } from '@/store'
+
+const companyStore = useCompanyStore()
+const canManage = computed(() => ['owner', 'admin'].includes(companyStore.activeCompany?.role || ''))
 
 const capabilityOptions = ['text', 'image', 'video', 'email', 'whatsapp', 'sms', 'push', 'commerce', 'social'].map(value => ({ label: value, value }))
 const connections = ref<IntegrationConnection[]>([])

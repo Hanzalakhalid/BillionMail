@@ -5,7 +5,9 @@ import (
 	"billionmail-core/internal/controller/abnormal_recipient"
 	ad_intel_ctrl "billionmail-core/internal/controller/ad_intel"
 	"billionmail-core/internal/controller/askai"
+	assets_ctrl "billionmail-core/internal/controller/assets"
 	"billionmail-core/internal/controller/batch_mail"
+	business_ctrl "billionmail-core/internal/controller/business"
 	"billionmail-core/internal/controller/campaign"
 	chatbot_ctrl "billionmail-core/internal/controller/chatbot"
 	companies_ctrl "billionmail-core/internal/controller/companies"
@@ -25,6 +27,8 @@ import (
 	"billionmail-core/internal/controller/middleware"
 	"billionmail-core/internal/controller/operation_log"
 	"billionmail-core/internal/controller/overview"
+	products_ctrl "billionmail-core/internal/controller/products"
+	projects_ctrl "billionmail-core/internal/controller/projects"
 	push_ctrl "billionmail-core/internal/controller/push"
 	"billionmail-core/internal/controller/rbac"
 	"billionmail-core/internal/controller/relay"
@@ -362,6 +366,10 @@ var (
 					companies_ctrl.NewV1(),
 					identity_ctrl.NewV1(),
 					integrations_ctrl.NewV1(),
+					assets_ctrl.NewV1(),
+					business_ctrl.NewV1(),
+					products_ctrl.NewV1(),
+					projects_ctrl.NewV1(),
 					ad_intel_ctrl.NewV1(),
 					workflow_ctrl.NewV1(),
 					chatbot_ctrl.NewV1(),

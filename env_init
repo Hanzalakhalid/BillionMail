@@ -62,3 +62,6 @@ RETENTION_DAYS=7
 # Use a unique persistent 32-byte base64 key for local encrypted integrations.
 # Production deployments use SAAS_KMS_KEY_ARN instead.
 SAAS_LOCAL_MASTER_KEY=
+
+# Public storage origin used for browser upload/download signatures.
+MEDIA_PUBLIC_ENDPOINT=http://localhost:29000

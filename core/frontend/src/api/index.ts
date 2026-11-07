@@ -8,6 +8,7 @@ interface FetchOptions {
 	loading: string
 	loadFn: () => void
 	cancelResInterceptor: boolean
+	rawResponse?: boolean
 }
 
 const instance = axios.create({
@@ -98,7 +99,12 @@ instance.interceptors.request.use(config => {
 instance.interceptors.request.use(config => {
 	const { fetchOptions } = config
 	if (isObject<FetchOptions>(fetchOptions)) {
-		config.url = `${fetchOptions.prefix}` + config.url
+		const prefix = fetchOptions.prefix || ''
+		const url = config.url || ''
+		// Axios reuses the already-prefixed config after a token refresh.
+		if (prefix && url !== prefix && !url.startsWith(`${prefix}/`) && !url.startsWith(`${prefix}?`)) {
+			config.url = prefix + url
+		}
 	}
 	return config
 })
@@ -127,6 +133,12 @@ instance.interceptors.response.use(
 
 		if (fetchOptions?.loadFn) {
 			fetchOptions.loadFn()
+		}
+
+		// New versioned resources use direct JSON responses. Existing endpoints
+		// retain their envelope, including application errors returned with 200.
+		if (fetchOptions?.rawResponse && !(success === false && typeof code === 'number')) {
+			return Promise.resolve(response.data)
 		}
 
 		if (response.data.type === 'application/octet-stream') {

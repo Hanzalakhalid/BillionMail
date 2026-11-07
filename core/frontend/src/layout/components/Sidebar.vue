@@ -123,6 +123,10 @@ const iconMap: Record<string, VNodeChild> = {
 	whatsapp: <i class="i-mdi-whatsapp"></i>,
 	team: <i class="i-mdi-account-group-outline"></i>,
 	integrations: <i class="i-mdi-connection"></i>,
+	assets: <i class="i-mdi-image-multiple"></i>,
+	business: <i class="i-mdi-store-outline"></i>,
+	products: <i class="i-mdi-package-variant-closed"></i>,
+	projects: <i class="i-mdi-forum-outline"></i>,
 	logout: <i class="i-mdi-logout"></i>,
 }
 

@@ -26,7 +26,7 @@ import (
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
-	if err := database_initialization.InitDatabase(); err != nil {
+	if err := database_initialization.InitWorkerDatabase(ctx); err != nil {
 		panic(err)
 	}
 	redisOpt := platformqueue.RedisClientOpt()
@@ -54,6 +54,7 @@ func main() {
 	}
 	deliveryHandler := whatsappdelivery.Handler{Store: secretStore, APIVersion: public.MustGetDockerEnv("META_GRAPH_API_VERSION", "v23.0")}
 	processor := platformqueue.Processor{Consumer: "saas-worker", Handlers: map[string]platformqueue.Handler{
+		"platform.schedule.probe":               func(context.Context, platformqueue.Event) error { return nil },
 		"identity.email_verification.requested": emailHandler.Handle,
 		"identity.password_reset.requested":     emailHandler.Handle,
 		"company.invitation.created":            emailHandler.Handle,
@@ -62,6 +63,13 @@ func main() {
 	}}
 
 	server := asynq.NewServer(redisOpt, asynq.Config{
+		ErrorHandler: asynq.ErrorHandlerFunc(func(taskCtx context.Context, task *asynq.Task, failure error) {
+			errorCtx, cancel := context.WithTimeout(context.WithoutCancel(taskCtx), 5*time.Second)
+			defer cancel()
+			if err := platformqueue.RecordTaskFailure(errorCtx, task, failure); err != nil {
+				fmt.Fprintln(os.Stderr, "record task failure:", err)
+			}
+		}),
 		Concurrency:     10,
 		Queues:          map[string]int{"webhooks": 8, "delivery": 8, "notifications": 4, "default": 2},
 		ShutdownTimeout: 30 * time.Second,

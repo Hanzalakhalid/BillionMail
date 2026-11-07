@@ -9,6 +9,7 @@ func TestWorkloadQueue(t *testing.T) {
 		"whatsapp.webhook.received":             "webhooks",
 		"whatsapp.message.send":                 "delivery",
 		"analytics.refresh":                     "default",
+		"asset.upload.validate":                 "media",
 	}
 	for eventType, expected := range tests {
 		if actual := workloadQueue(eventType); actual != expected {

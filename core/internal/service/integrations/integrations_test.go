@@ -33,3 +33,10 @@ func TestValidateRequiresStructuredConfiguration(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestValidateRejectsCredentialsInsideNestedArrays(t *testing.T) {
+	input := Input{Provider: "provider", Capability: "text", Name: "primary", Secret: "encrypted", Configuration: json.RawMessage(`{"settings":[[{"api_key":"must-not-be-public"}]]}`)}
+	if Validate(input) == nil {
+		t.Fatal("secret inside nested arrays accepted as public metadata")
+	}
+}

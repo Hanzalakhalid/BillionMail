@@ -111,7 +111,7 @@ func InviteMember(ctx context.Context, tenant TenantContext, email, role, accept
 		_, _ = tx.Model("company_invitations").Data(g.Map{"revoked_at": time.Now().UTC()}).Where("company_id", tenant.CompanyID).Where("LOWER(email) = ?", email).WhereNull("accepted_at").WhereNull("revoked_at").Update()
 		if _, err = tx.Model("company_invitations").Data(g.Map{
 			"id": invitation.ID, "company_id": tenant.CompanyID, "email": email, "role": role,
-			"token_hash": tokenHash, "invited_by": tenant.UserID, "expires_at": invitation.ExpiresAt,
+			"token_hash": gdb.Raw("decode('" + hex.EncodeToString(tokenHash) + "','hex')"), "invited_by": tenant.UserID, "expires_at": invitation.ExpiresAt,
 		}).Insert(); err != nil {
 			return err
 		}

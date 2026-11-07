@@ -54,10 +54,10 @@ func (p PermissionSet) Allows(permission string) bool {
 
 var rolePermissions = map[string][]string{
 	"owner":   {"*"},
-	"admin":   {"company.read", "company.update", "member.read", "member.manage", "channel.*", "flow.*", "contact.*", "conversation.*", "integration.*", "analytics.read", "audit.read", "usage.read"},
-	"manager": {"company.read", "member.read", "channel.read", "flow.*", "contact.*", "conversation.*", "integration.read", "analytics.read", "usage.read"},
+	"admin":   {"company.read", "company.update", "member.read", "member.manage", "channel.*", "flow.*", "contact.*", "conversation.*", "integration.*", "asset.*", "business.*", "product.*", "project.*", "job.manage", "analytics.read", "audit.read", "usage.read"},
+	"manager": {"company.read", "member.read", "channel.read", "flow.*", "contact.*", "conversation.*", "integration.read", "asset.*", "business.*", "product.*", "project.*", "analytics.read", "usage.read"},
 	"agent":   {"company.read", "contact.read", "contact.update", "conversation.read", "conversation.reply", "conversation.assign"},
-	"viewer":  {"company.read", "channel.read", "flow.read", "contact.read", "conversation.read", "analytics.read", "usage.read"},
+	"viewer":  {"company.read", "channel.read", "flow.read", "contact.read", "conversation.read", "asset.read", "business.read", "product.read", "project.read", "analytics.read", "usage.read"},
 }
 
 func PermissionsForRole(role string) PermissionSet {

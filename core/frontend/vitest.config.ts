@@ -8,6 +8,7 @@ export default defineConfig({
     vue(),
     AutoImport({
       imports: ['vue', 'vue-router', 'vue-i18n'],
+      dts: false,
     }),
   ],
   define: {

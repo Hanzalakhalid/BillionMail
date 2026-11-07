@@ -78,7 +78,7 @@ func (m *RBACMiddleware) PermissionCheck(r *ghttp.Request) {
 	}
 	// Versioned SaaS endpoints enforce workspace permissions in their services.
 	// They must not inherit the legacy installation-wide role matrix.
-	if strings.HasPrefix(r.URL.Path, "/api/v1/companies/") || strings.HasPrefix(r.URL.Path, "/api/v1/integrations/") {
+	if strings.HasPrefix(r.URL.Path, "/api/v1/companies/") || strings.HasPrefix(r.URL.Path, "/api/v1/integrations/") || strings.HasPrefix(r.URL.Path, "/api/v1/assets/") || strings.HasPrefix(r.URL.Path, "/api/v1/business/") || strings.HasPrefix(r.URL.Path, "/api/v1/products/") || strings.HasPrefix(r.URL.Path, "/api/v1/projects/") {
 		r.Middleware.Next()
 		return
 	}

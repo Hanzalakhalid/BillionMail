@@ -21,6 +21,33 @@ var migrationFiles embed.FS
 
 const migrationLockID int64 = 7249150381
 
+// Ready proves that every migration embedded in this binary was applied. A
+// worker waits for the API upgrade instead of racing legacy bootstrap code.
+func Ready(ctx context.Context) (bool, error) {
+	table, err := g.DB().GetValue(ctx, "SELECT to_regclass('public.goose_db_version') IS NOT NULL")
+	if err != nil || !table.Bool() {
+		return false, err
+	}
+	entries, err := fs.ReadDir(migrationFiles, "sql")
+	if err != nil {
+		return false, err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".sql") {
+			continue
+		}
+		version, err := strconv.ParseInt(strings.SplitN(entry.Name(), "_", 2)[0], 10, 64)
+		if err != nil {
+			return false, err
+		}
+		count, err := g.DB().Model("goose_db_version").Ctx(ctx).Where("version_id", version).Where("is_applied", true).Count()
+		if err != nil || count == 0 {
+			return false, err
+		}
+	}
+	return true, nil
+}
+
 // Up applies all pending transactional migrations. Files deliberately use the
 // Goose annotation format, allowing the Goose CLI to inspect and operate the
 // same migration history in production.

@@ -46,7 +46,7 @@ func CreateSession(ctx context.Context, userID, companyID uuid.UUID, userAgent, 
 	session := Session{ID: uuid.New(), UserID: userID, TokenFamily: uuid.New(), ActiveCompanyID: companyID, ExpiresAt: time.Now().UTC().Add(ttl)}
 	data := g.Map{
 		"id": session.ID, "user_id": session.UserID, "token_family": session.TokenFamily,
-		"refresh_token_hash": hash, "active_company_id": session.ActiveCompanyID,
+		"refresh_token_hash": gdb.Raw("decode('" + hex.EncodeToString(hash) + "','hex')"), "active_company_id": session.ActiveCompanyID,
 		"user_agent": userAgent, "expires_at": session.ExpiresAt,
 	}
 	if parsed := net.ParseIP(ip); parsed != nil {
@@ -65,6 +65,7 @@ func RotateSession(ctx context.Context, token string, ttl time.Duration) (Sessio
 		return Session{}, "", err
 	}
 	var next Session
+	invalid := false
 	err = g.DB().Transaction(ctx, func(_ context.Context, tx gdb.TX) error {
 		var current Session
 		if err := tx.Model("auth_sessions").Where("refresh_token_hash = decode(?, 'hex')", hex.EncodeToString(hash[:])).LockUpdate().Scan(&current); err != nil {
@@ -74,8 +75,10 @@ func RotateSession(ctx context.Context, token string, ttl time.Duration) (Sessio
 			return ErrInvalidRefreshToken
 		}
 		if current.RotatedAt != nil || current.RevokedAt != nil || time.Now().UTC().After(current.ExpiresAt) {
-			_, _ = tx.Model("auth_sessions").Data(g.Map{"revoked_at": time.Now().UTC(), "revoke_reason": "refresh_token_reuse"}).Where("token_family", current.TokenFamily).WhereNull("revoked_at").Update()
-			return ErrInvalidRefreshToken
+			_, err := tx.Model("auth_sessions").Data(g.Map{"revoked_at": time.Now().UTC(), "revoke_reason": "refresh_token_reuse"}).Where("token_family", current.TokenFamily).WhereNull("revoked_at").Update()
+			invalid = true
+			// Commit the revocation before reporting the rejected token.
+			return err
 		}
 		now := time.Now().UTC()
 		if _, err := tx.Model("auth_sessions").Data(g.Map{"rotated_at": now, "last_used_at": now}).Where("id", current.ID).Update(); err != nil {
@@ -84,13 +87,16 @@ func RotateSession(ctx context.Context, token string, ttl time.Duration) (Sessio
 		next = Session{ID: uuid.New(), UserID: current.UserID, TokenFamily: current.TokenFamily, ActiveCompanyID: current.ActiveCompanyID, ExpiresAt: now.Add(ttl)}
 		_, err := tx.Model("auth_sessions").Data(g.Map{
 			"id": next.ID, "user_id": next.UserID, "token_family": next.TokenFamily,
-			"refresh_token_hash": newHash, "active_company_id": next.ActiveCompanyID,
+			"refresh_token_hash": gdb.Raw("decode('" + hex.EncodeToString(newHash) + "','hex')"), "active_company_id": next.ActiveCompanyID,
 			"expires_at": next.ExpiresAt,
 		}).Insert()
 		return err
 	})
 	if err != nil {
 		return Session{}, "", err
+	}
+	if invalid {
+		return Session{}, "", ErrInvalidRefreshToken
 	}
 	return next, newToken, nil
 }

@@ -50,6 +50,31 @@ jobs:
         run: go vet ./internal/migrations ./internal/service/tenancy ./internal/service/platform ./internal/service/identity ./internal/service/queue ./internal/service/notifications ./internal/service/secrets ./internal/service/whatsappchannel ./internal/service/whatsappwebhook ./internal/service/database_initialization ./internal/service/redis_initialization ./internal/controller/companies ./internal/controller/identity ./internal/controller/metawebhook ./internal/service/rbac ./internal/controller/rbac ./cmd/saas-worker
       - name: Unit and integration tests
         run: go test -count=1 ./internal/migrations ./internal/service/tenancy ./internal/service/platform ./internal/service/identity ./internal/service/queue ./internal/service/notifications ./internal/service/secrets ./internal/service/whatsappchannel ./internal/service/whatsappwebhook ./internal/service/database_initialization ./internal/service/redis_initialization ./internal/controller/companies ./internal/controller/identity ./internal/controller/metawebhook ./internal/service/rbac ./internal/controller/rbac
+      - name: Marketing foundation checks
+        run: |
+          test -z "$(gofmt -l internal/service/projects internal/controller/projects api/projects internal/service/products internal/controller/products api/products internal/service/business internal/controller/business api/business internal/service/scheduler internal/service/integrations internal/service/objectstorage internal/service/assets internal/service/antivirus internal/controller/integrations internal/controller/assets api/assets cmd/scheduler cmd/media-worker cmd/storage-init)"
+          go vet ./internal/service/projects ./internal/controller/projects ./api/projects/... ./api/products/... ./internal/service/products ./internal/controller/products ./internal/service/business ./internal/controller/business ./internal/service/scheduler ./internal/service/integrations ./internal/service/objectstorage ./internal/service/assets ./internal/service/antivirus ./internal/controller/integrations ./internal/controller/assets ./cmd/scheduler ./cmd/media-worker ./cmd/storage-init
+          go test -count=1 ./internal/service/projects ./internal/controller/projects ./api/projects/... ./api/products/... ./internal/service/products ./internal/controller/products ./internal/service/business ./internal/controller/business ./internal/service/scheduler ./internal/service/integrations ./internal/service/objectstorage ./internal/service/assets ./internal/service/antivirus ./internal/controller/integrations ./internal/controller/assets
+          go build -o /tmp/scheduler ./cmd/scheduler
+          go build -o /tmp/saas-worker ./cmd/saas-worker
+          go build -o /tmp/media-worker ./cmd/media-worker
+          go build -o /tmp/storage-init ./cmd/storage-init
+
+  compose-foundation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f compose.test.yml run --rm backend
+      - if: always()
+        run: docker compose -f compose.test.yml down --remove-orphans
+
+  antivirus-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose -f compose.test.yml -p billionmail-av-test --profile antivirus run --rm antivirus-check
+      - if: always()
+        run: docker compose -f compose.test.yml -p billionmail-av-test --profile antivirus down --remove-orphans
 
   frontend:
     runs-on: ubuntu-latest

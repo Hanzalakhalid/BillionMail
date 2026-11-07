@@ -41,7 +41,12 @@ services:
             - redis
 
     minio-billionmail:
-      image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+      image: ${BILLIONMAIL_MINIO_IMAGE:-billionmail/minio:community-7aac2a2}
+      build:
+        context: .
+        dockerfile: Dockerfiles/storage/Dockerfile
+        target: server
+        secrets: [host_ca]
       command: server /data --console-address :9001
       volumes:
         - ./media-data:/data
@@ -51,6 +56,11 @@ services:
       ports:
         - "${MINIO_API_PORT:-127.0.0.1:29000}:9000"
         - "${MINIO_CONSOLE_PORT:-127.0.0.1:29001}:9001"
+      healthcheck:
+        test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/minio/health/ready"]
+        interval: 10s
+        timeout: 5s
+        retries: 12
       restart: always
       networks:
         billionmail-network:
@@ -58,14 +68,22 @@ services:
             - minio
 
     minio-init-billionmail:
-      image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+      image: billionmail/storage-init:marketing-local
+      build:
+        context: .
+        dockerfile: Dockerfiles/storage/Dockerfile
+        target: init
+        secrets: [host_ca]
       depends_on:
-        - minio-billionmail
-      entrypoint: ["/bin/sh", "-c"]
-      command: ["until mc alias set local http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" && mc mb --ignore-existing local/marketing-assets; do sleep 2; done"]
+        minio-billionmail:
+          condition: service_healthy
       environment:
-        - MINIO_ROOT_USER=${DBUSER}
-        - MINIO_ROOT_PASSWORD=${DBPASS}
+        - MEDIA_BUCKET=marketing-assets
+        - MEDIA_REGION=us-east-1
+        - MEDIA_ENDPOINT=http://minio:9000
+        - MEDIA_ACCESS_KEY=${DBUSER}
+        - MEDIA_SECRET_KEY=${DBPASS}
+        - MEDIA_PATH_STYLE=true
       networks:
         billionmail-network:
           aliases:
@@ -204,7 +222,11 @@ services:
             - webmail
 
     core-billionmail:
-      image: billionmail/core:4.9.3
+      image: ${BILLIONMAIL_CORE_IMAGE:-billionmail/core:marketing-local}
+      build:
+        context: .
+        dockerfile: Dockerfiles/core/Dockerfile.source
+        secrets: [host_ca]
       hostname: core-manage
       depends_on:
         - pgsql-billionmail
@@ -232,6 +254,7 @@ services:
         - MEDIA_BUCKET=marketing-assets
         - MEDIA_REGION=us-east-1
         - MEDIA_ENDPOINT=http://minio:9000
+        - MEDIA_PUBLIC_ENDPOINT=${MEDIA_PUBLIC_ENDPOINT:-http://localhost:29000}
         - MEDIA_ACCESS_KEY=${DBUSER}
         - MEDIA_SECRET_KEY=${DBPASS}
         - MEDIA_PATH_STYLE=true
@@ -248,8 +271,86 @@ services:
           aliases:
             - core
 
+    clamav-billionmail:
+      image: ${CLAMAV_IMAGE:-clamav/clamav:1.5}
+      volumes:
+        - clamav-signatures:/var/lib/clamav
+      restart: always
+      networks:
+        billionmail-network:
+          aliases:
+            - clamav
+
+    media-worker-billionmail:
+      image: ${BILLIONMAIL_MEDIA_IMAGE:-billionmail/media:marketing-local}
+      build:
+        context: .
+        dockerfile: Dockerfiles/media/Dockerfile
+        secrets: [host_ca]
+      depends_on:
+        - pgsql-billionmail
+        - redis-billionmail
+        - minio-init-billionmail
+        - clamav-billionmail
+      environment:
+        - TZ=${TZ}
+        - DBNAME=${DBNAME}
+        - DBUSER=${DBUSER}
+        - DBPASS=${DBPASS}
+        - DB_HOST=pgsql
+        - DB_PORT=5432
+        - REDIS_ADDR=redis:6379
+        - REDISPASS=${REDISPASS}
+        - REDISDB=${REDISDB:-1}
+        - CLAMD_ADDR=clamav:3310
+        - MEDIA_BUCKET=marketing-assets
+        - MEDIA_REGION=us-east-1
+        - MEDIA_ENDPOINT=http://minio:9000
+        - MEDIA_PUBLIC_ENDPOINT=${MEDIA_PUBLIC_ENDPOINT:-http://localhost:29000}
+        - MEDIA_ACCESS_KEY=${DBUSER}
+        - MEDIA_SECRET_KEY=${DBPASS}
+        - MEDIA_PATH_STYLE=true
+      healthcheck:
+        test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8082/healthz"]
+        interval: 15s
+        timeout: 6s
+        retries: 3
+        start_period: 180s
+      restart: always
+      networks:
+        billionmail-network:
+          aliases:
+            - media-worker
+
+    scheduler-billionmail:
+      image: ${BILLIONMAIL_CORE_IMAGE:-billionmail/core:marketing-local}
+      pull_policy: never
+      entrypoint: []
+      command: ["/opt/billionmail/core/scheduler"]
+      working_dir: /opt/billionmail/core
+      depends_on:
+        - pgsql-billionmail
+      volumes:
+        - ./postgresql-socket:/opt/billionmail/postgresql-socket
+        - ./.env:/opt/billionmail/.env:ro
+      environment:
+        - TZ=${TZ}
+        - SCHEDULER_HEALTH_ADDR=:8081
+      healthcheck:
+        test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8081/healthz"]
+        interval: 10s
+        timeout: 5s
+        retries: 3
+        start_period: 60s
+      restart: always
+      networks:
+        billionmail-network:
+          aliases:
+            - scheduler
+
     saas-worker-billionmail:
-      image: billionmail/core:4.9.3
+      image: ${BILLIONMAIL_CORE_IMAGE:-billionmail/core:marketing-local}
+      pull_policy: never
       entrypoint: []
       command: ["/opt/billionmail/core/saas-worker"]
       working_dir: /opt/billionmail/core
@@ -272,6 +373,7 @@ services:
         - MEDIA_BUCKET=marketing-assets
         - MEDIA_REGION=us-east-1
         - MEDIA_ENDPOINT=http://minio:9000
+        - MEDIA_PUBLIC_ENDPOINT=${MEDIA_PUBLIC_ENDPOINT:-http://localhost:29000}
         - MEDIA_ACCESS_KEY=${DBUSER}
         - MEDIA_SECRET_KEY=${DBPASS}
         - MEDIA_PATH_STYLE=true
@@ -281,6 +383,13 @@ services:
           aliases:
             - saas-worker
 
+
+secrets:
+  host_ca:
+    file: ${BILLIONMAIL_BUILD_CA_FILE:-./core/test/certs/.gitkeep}
+
+volumes:
+  clamav-signatures:
 
 networks:
   billionmail-network:

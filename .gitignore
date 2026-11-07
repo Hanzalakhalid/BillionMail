@@ -36,6 +36,7 @@ ssl-self-signed/cert.pem
 ssl-self-signed/key.pem
 core/billionmail*
 core/saas-worker-*
+core/scheduler-*
 core/etc/
 
 # Claude Code
@@ -46,6 +47,7 @@ core/frontend/.claude/
 # Frontend dev artifacts
 core/frontend/.pnpm-store/
 core/frontend/coverage/
+core/frontend/auto-imports.d.ts
 
 # Python
 __pycache__/

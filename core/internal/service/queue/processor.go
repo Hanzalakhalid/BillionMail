@@ -31,8 +31,29 @@ func (p Processor) HandleTask(ctx context.Context, task *asynq.Task) error {
 	if event.ID == uuid.Nil || event.CompanyID == uuid.Nil || event.EventType == "" {
 		return fmt.Errorf("invalid outbox event: %w", asynq.SkipRetry)
 	}
+	var stored struct {
+		Event
+		DeadLetteredAt *time.Time `json:"dead_lettered_at"`
+	}
+	err := g.DB().Transaction(ctx, func(_ context.Context, tx gdb.TX) error {
+		if _, err := tx.Exec("SELECT set_config('app.company_id', ?, true)", event.CompanyID.String()); err != nil {
+			return err
+		}
+		return tx.Model("outbox_events").Where("id", event.ID).Where("company_id", event.CompanyID).Scan(&stored)
+	})
+	if err != nil {
+		return err
+	}
+	if stored.ID == uuid.Nil {
+		return fmt.Errorf("outbox event missing: %w", asynq.SkipRetry)
+	}
+	if stored.DispatchGeneration != event.DispatchGeneration || stored.DeadLetteredAt != nil {
+		return nil
+	}
+	// Redis carries a reference envelope; PostgreSQL owns the command content.
+	event = stored.Event
 	completed, err := g.DB().Model("outbox_deliveries").Ctx(ctx).
-		Where("event_id", event.ID).Where("consumer", p.Consumer).Count()
+		Where("event_id", event.ID).Where("company_id", event.CompanyID).Where("consumer", p.Consumer).Count()
 	if err != nil {
 		return err
 	}
@@ -54,6 +75,11 @@ func (p Processor) HandleTask(ctx context.Context, task *asynq.Task) error {
             (id,company_id,event_id,consumer,completed_at)
             VALUES(?,?,?,?,?) ON CONFLICT(event_id,consumer) DO NOTHING`,
 			uuid.New(), event.CompanyID, event.ID, p.Consumer, time.Now().UTC())
+		if txErr != nil {
+			return txErr
+		}
+		_, txErr = tx.Model("marketing_job_runs").Where("company_id", event.CompanyID).Where("outbox_event_id", event.ID).
+			Data(g.Map{"status": "succeeded", "updated_at": time.Now().UTC()}).Update()
 		return txErr
 	})
 }

@@ -111,7 +111,7 @@ func Register(ctx context.Context, input Registration, tokenSecret, publicURL st
 			return txErr
 		}
 		if _, txErr = tx.Model("email_verification_tokens").Data(g.Map{
-			"id": verificationID, "user_id": userID, "token_hash": verificationHash, "expires_at": time.Now().UTC().Add(24 * time.Hour),
+			"id": verificationID, "user_id": userID, "token_hash": gdb.Raw("decode('" + hex.EncodeToString(verificationHash) + "','hex')"), "expires_at": time.Now().UTC().Add(24 * time.Hour),
 		}).Insert(); txErr != nil {
 			return txErr
 		}
@@ -192,7 +192,7 @@ func RequestPasswordReset(ctx context.Context, email, tokenSecret, publicURL str
 			return err
 		}
 		_, _ = tx.Model("password_reset_tokens").Data(g.Map{"used_at": time.Now().UTC()}).Where("user_id", user.ID).WhereNull("used_at").Update()
-		if _, err := tx.Model("password_reset_tokens").Data(g.Map{"id": tokenID, "user_id": user.ID, "token_hash": tokenHash, "expires_at": time.Now().UTC().Add(time.Hour)}).Insert(); err != nil {
+		if _, err := tx.Model("password_reset_tokens").Data(g.Map{"id": tokenID, "user_id": user.ID, "token_hash": gdb.Raw("decode('" + hex.EncodeToString(tokenHash) + "','hex')"), "expires_at": time.Now().UTC().Add(time.Hour)}).Insert(); err != nil {
 			return err
 		}
 		payload, _ := json.Marshal(g.Map{"token_id": tokenID, "purpose": "reset-password", "email": user.Email, "public_url": publicURL})

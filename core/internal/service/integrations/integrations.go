@@ -44,7 +44,7 @@ func Validate(input Input) error {
 	input.Provider = strings.TrimSpace(input.Provider)
 	input.Capability = strings.TrimSpace(input.Capability)
 	input.Name = strings.TrimSpace(input.Name)
-	if input.Provider == "" || len(input.Provider) > 80 || input.Capability == "" || len(input.Capability) > 80 || input.Name == "" || len(input.Name) > 160 || input.Secret == "" {
+	if input.Provider == "" || len(input.Provider) > 80 || input.Capability == "" || len(input.Capability) > 80 || input.Name == "" || len(input.Name) > 160 || input.Secret == "" || len(input.Secret) > 64*1024 {
 		return errors.New("provider, capability, name, and secret are required within their length limits")
 	}
 	if len(input.Configuration) == 0 {
@@ -63,18 +63,21 @@ func validateConfiguration(config map[string]any) error {
 		if strings.Contains(lower, "secret") || strings.Contains(lower, "token") || strings.Contains(lower, "password") || strings.Contains(lower, "api_key") || strings.Contains(lower, "apikey") || strings.Contains(lower, "credential") || strings.Contains(lower, "private_key") {
 			return fmt.Errorf("configuration field %q may contain a credential; use secret", key)
 		}
-		switch nested := value.(type) {
-		case map[string]any:
-			if err := validateConfiguration(nested); err != nil {
+		if err := validateConfigurationValue(value); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateConfigurationValue(value any) error {
+	switch nested := value.(type) {
+	case map[string]any:
+		return validateConfiguration(nested)
+	case []any:
+		for _, item := range nested {
+			if err := validateConfigurationValue(item); err != nil {
 				return err
-			}
-		case []any:
-			for _, item := range nested {
-				if child, ok := item.(map[string]any); ok {
-					if err := validateConfiguration(child); err != nil {
-						return err
-					}
-				}
 			}
 		}
 	}
@@ -105,6 +108,9 @@ func Create(ctx context.Context, tenant tenancy.TenantContext, store secrets.Env
 	if err := Validate(input); err != nil {
 		return uuid.Nil, err
 	}
+	if len(input.Configuration) == 0 {
+		input.Configuration = json.RawMessage(`{}`)
+	}
 	envelope, err := store.Encrypt(ctx, tenant.CompanyID, []byte(input.Secret))
 	if err != nil {
 		return uuid.Nil, err
@@ -114,7 +120,7 @@ func Create(ctx context.Context, tenant tenancy.TenantContext, store secrets.Env
 		if _, err := tx.Exec("SELECT set_config('app.company_id', ?, true)", tenant.CompanyID.String()); err != nil {
 			return err
 		}
-		if _, err := tx.Model("integration_connections").Data(g.Map{"id": id, "company_id": tenant.CompanyID, "provider": strings.TrimSpace(input.Provider), "capability": strings.TrimSpace(input.Capability), "name": strings.TrimSpace(input.Name), "configuration": input.Configuration, "created_by": tenant.UserID}).Insert(); err != nil {
+		if _, err := tx.Model("integration_connections").Data(g.Map{"id": id, "company_id": tenant.CompanyID, "provider": strings.TrimSpace(input.Provider), "capability": strings.TrimSpace(input.Capability), "name": strings.TrimSpace(input.Name), "configuration": string(input.Configuration), "created_by": tenant.UserID}).Insert(); err != nil {
 			return err
 		}
 		if err := insertCredential(tx, tenant, id, 1, envelope); err != nil {

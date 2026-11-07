@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,14 +18,15 @@ import (
 const OutboxTaskType = "platform:outbox:deliver"
 
 type Event struct {
-	ID             uuid.UUID       `json:"id"`
-	CompanyID      uuid.UUID       `json:"company_id"`
-	AggregateType  string          `json:"aggregate_type"`
-	AggregateID    string          `json:"aggregate_id"`
-	EventType      string          `json:"event_type"`
-	Payload        json.RawMessage `json:"payload"`
-	IdempotencyKey string          `json:"idempotency_key"`
-	Attempts       int             `json:"attempts"`
+	ID                 uuid.UUID       `json:"id"`
+	CompanyID          uuid.UUID       `json:"company_id"`
+	AggregateType      string          `json:"aggregate_type"`
+	AggregateID        string          `json:"aggregate_id"`
+	EventType          string          `json:"event_type"`
+	Payload            json.RawMessage `json:"payload"`
+	IdempotencyKey     string          `json:"idempotency_key"`
+	Attempts           int             `json:"attempts"`
+	DispatchGeneration int             `json:"dispatch_generation"`
 }
 
 type Publisher interface {
@@ -100,7 +102,7 @@ func (d Dispatcher) claim(ctx context.Context) ([]Event, error) {
             FROM candidates
             WHERE event.id=candidates.id
             RETURNING event.id,event.company_id,event.aggregate_type,event.aggregate_id,
-                      event.event_type,event.payload,event.idempotency_key,event.attempts`,
+                      event.event_type,event.payload,event.idempotency_key,event.attempts,event.dispatch_generation`,
 			int64(d.Lease.Seconds()), d.BatchSize, d.WorkerID)
 		if queryErr != nil {
 			return queryErr
@@ -143,9 +145,17 @@ func (p AsynqPublisher) Publish(ctx context.Context, event Event) error {
 		return err
 	}
 	queueName := workloadQueue(event.EventType)
+	taskTimeout := 2 * time.Minute
+	if queueName == "media" {
+		taskTimeout = 5 * time.Minute
+	}
+	taskID := event.ID.String()
+	if event.DispatchGeneration > 0 {
+		taskID += ":" + strconv.Itoa(event.DispatchGeneration)
+	}
 	_, err = p.Client.EnqueueContext(ctx, asynq.NewTask(OutboxTaskType, payload),
-		asynq.TaskID(event.ID.String()), asynq.Queue(queueName), asynq.MaxRetry(12),
-		asynq.Timeout(2*time.Minute), asynq.Retention(24*time.Hour))
+		asynq.TaskID(taskID), asynq.Queue(queueName), asynq.MaxRetry(12),
+		asynq.Timeout(taskTimeout), asynq.Retention(24*time.Hour))
 	if errors.Is(err, asynq.ErrTaskIDConflict) {
 		return nil
 	}
@@ -154,6 +164,8 @@ func (p AsynqPublisher) Publish(ctx context.Context, event Event) error {
 
 func workloadQueue(eventType string) string {
 	switch {
+	case strings.HasPrefix(eventType, "asset."):
+		return "media"
 	case strings.HasPrefix(eventType, "identity."), strings.HasPrefix(eventType, "company.invitation."):
 		return "notifications"
 	case strings.HasPrefix(eventType, "whatsapp.webhook."):

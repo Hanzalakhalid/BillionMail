@@ -1,0 +1,112 @@
+name: billionmail-test
+services:
+  postgres:
+    image: postgres:17.4-alpine
+    environment:
+      POSTGRES_USER: billionmail
+      POSTGRES_PASSWORD: test-only-password
+      POSTGRES_DB: billionmail_tenant_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U billionmail -d billionmail_tenant_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  redis:
+    image: redis:7.4.2-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  minio:
+    image: billionmail/minio:community-7aac2a2
+    build:
+      context: .
+      dockerfile: Dockerfiles/storage/Dockerfile
+      target: server
+      secrets: [host_ca]
+    command: server /data
+    tmpfs:
+      - /data
+    environment:
+      MINIO_ROOT_USER: test-storage
+      MINIO_ROOT_PASSWORD: test-storage-password
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9000/minio/health/ready"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  minio-init:
+    image: billionmail/storage-init:marketing-local
+    build:
+      context: .
+      dockerfile: Dockerfiles/storage/Dockerfile
+      target: init
+      secrets: [host_ca]
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MEDIA_BUCKET: marketing-assets
+      MEDIA_REGION: us-east-1
+      MEDIA_ENDPOINT: http://minio:9000
+      MEDIA_ACCESS_KEY: test-storage
+      MEDIA_SECRET_KEY: test-storage-password
+      MEDIA_PATH_STYLE: "true"
+  clamav:
+    image: clamav/clamav:1.5
+    profiles: [antivirus]
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "true"
+  antivirus-check:
+    image: golang:1.24-alpine
+    profiles: [antivirus]
+    working_dir: /src
+    entrypoint: ["sh", "/workspace/test/antivirus.sh"]
+    depends_on:
+      clamav:
+        condition: service_healthy
+    environment:
+      BM_TEST_CLAMD_ADDR: clamav:3310
+    volumes:
+      - ./core:/workspace:ro
+      - go-build:/root/.cache/go-build
+  backend:
+    image: golang:1.24-alpine
+    working_dir: /src
+    entrypoint: ["sh", "-c", "cp /workspace/test/foundation.sh /tmp/foundation.sh && exec sh /tmp/foundation.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      BM_TEST_DB_HOST: postgres
+      BM_TEST_DB_PORT: "5432"
+      BM_TEST_DB_USER: billionmail
+      BM_TEST_DB_PASSWORD: test-only-password
+      BM_TEST_DB_NAME: billionmail_tenant_test
+      BM_TEST_REDIS_ADDR: redis:6379
+      GOTOOLCHAIN: auto
+      BM_TEST_FULL: ${BM_TEST_FULL:-0}
+      BM_TEST_MEDIA_ENDPOINT: http://minio:9000
+      BM_TEST_MEDIA_ACCESS_KEY: test-storage
+      BM_TEST_MEDIA_SECRET_KEY: test-storage-password
+    volumes:
+      - ./core:/workspace:ro
+      - ${BM_TEST_GO_MOD_CACHE:-go-mod}:/go/pkg/mod
+      - go-build:/root/.cache/go-build
+      - ${BM_TEST_CA_DIRECTORY:-./core/test/certs}:/test-ca:ro
+secrets:
+  host_ca:
+    file: ${BILLIONMAIL_BUILD_CA_FILE:-./core/test/certs/.gitkeep}
+
+volumes:
+  go-mod:
+  go-build:
+    name: billionmail-go-build
